@@ -1,0 +1,10 @@
+[package]
+name = "streamfox-live"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+
+[profile.release]
+opt-level = 2
+lto = "thin"
