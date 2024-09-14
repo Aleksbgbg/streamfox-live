@@ -34,3 +34,29 @@ test-backend:
   script:
     - cd backend
     - cargo test
+
+build-frontend:
+  stage: build
+  image: node:latest
+  script:
+    - cd frontend
+    - npm install
+    - npm run build
+
+format-frontend:
+  stage: lint
+  image: node:latest
+  needs: []
+  script:
+    - cd frontend
+    - npm install
+    - npm run format:check
+
+lint-frontend:
+  stage: lint
+  image: node:latest
+  needs: []
+  script:
+    - cd frontend
+    - npm install
+    - npm run lint:check
