@@ -1,0 +1,36 @@
+stages:
+  - build
+  - lint
+  - test
+
+backend-build:
+  stage: build
+  image: rust:latest
+  needs: []
+  script:
+    - cd backend
+    - cargo build
+
+backend-format:
+  stage: lint
+  image: rust:latest
+  needs: []
+  script:
+    - cd backend
+    - cargo fmt --check
+
+backend-clippy:
+  stage: lint
+  image: rust:latest
+  needs: []
+  script:
+    - cd backend
+    - cargo clippy -- -Dwarnings
+
+backend-test:
+  stage: test
+  image: rust:latest
+  needs: []
+  script:
+    - cd backend
+    - cargo test
