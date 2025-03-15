@@ -1,2 +1,8 @@
 # Rust build
 target/
+
+# npm
+node_modules/
+
+# vite
+.vite/
