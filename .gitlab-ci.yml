@@ -11,6 +11,15 @@ backend-build:
     - cd backend
     - cargo build
 
+frontend-build:
+  stage: build
+  image: node:latest
+  needs: []
+  script:
+    - cd frontend
+    - npm install
+    - npm run build
+
 backend-format:
   stage: lint
   image: rust:latest
@@ -26,6 +35,24 @@ backend-clippy:
   script:
     - cd backend
     - cargo clippy -- -Dwarnings
+
+frontend-format:
+  stage: lint
+  image: node:latest
+  needs: []
+  script:
+    - cd frontend
+    - npm install
+    - npm run format:check
+
+frontend-lint:
+  stage: lint
+  image: node:latest
+  needs: []
+  script:
+    - cd frontend
+    - npm install
+    - npm run lint:check
 
 backend-test:
   stage: test
