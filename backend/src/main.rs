@@ -1,4 +1,6 @@
-use axum::Router;
+mod controllers;
+use crate::controllers::room;
+use axum::{Router, routing};
 use std::net::SocketAddr;
 use thiserror::Error;
 use tokio::net::TcpListener;
@@ -22,7 +24,11 @@ async fn start() -> Result<(), AppError> {
     .await
     .map_err(AppError::BindTcpListener)?;
 
-  let app = Router::new().layer(
+  let api = Router::new().nest(
+    "/room",
+    Router::new().route("/validate-name", routing::post(room::validate_name)),
+  );
+  let app = Router::new().nest("/api", api).layer(
     TraceLayer::new_for_http()
       .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
       .on_response(DefaultOnResponse::new().level(Level::INFO)),
