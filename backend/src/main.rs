@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::{select, signal};
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::{Level, error, info};
 
 #[derive(Debug, Error)]
@@ -21,7 +22,11 @@ async fn start() -> Result<(), AppError> {
     .await
     .map_err(AppError::BindTcpListener)?;
 
-  let app = Router::new();
+  let app = Router::new().layer(
+    TraceLayer::new_for_http()
+      .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+      .on_response(DefaultOnResponse::new().level(Level::INFO)),
+  );
 
   info!(
     "backend listening on {}",

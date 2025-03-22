@@ -11,5 +11,6 @@ lto = "thin"
 axum = { version = "0.8.1", default-features = false, features = ["http1", "tokio"] }
 thiserror = { version = "2.0.12", default-features = false }
 tokio = { version = "1.44.1", default-features = false, features = ["macros", "net", "rt-multi-thread", "signal"] }
+tower-http = { version = "0.6.2", default-features = false, features = ["trace"] }
 tracing = { version = "0.1.41", default-features = false }
 tracing-subscriber = { version = "0.3.19", default-features = false, features = ["ansi", "fmt"] }
