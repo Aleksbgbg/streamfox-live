@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useFetch } from "@/api";
 import { silenceApiError } from "@/errors";
+import { router } from "@/router";
 import { generateRoomName } from "@/strings";
 
 const name = ref(generateRoomName());
@@ -18,7 +19,10 @@ async function enter() {
 
   if (error.value) {
     silenceApiError(error.value);
+    return;
   }
+
+  router.push({ name: "room", params: { name: name.value } });
 }
 </script>
 
