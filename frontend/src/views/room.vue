@@ -1,22 +1,9 @@
 <script setup lang="ts">
 import { UserIcon } from "@heroicons/vue/24/solid";
-import { useFetch } from "@/api";
-import { router } from "@/router";
 
-const props = defineProps<{
+defineProps<{
   name: string;
 }>();
-
-const { error } = await useFetch({
-  method: "post",
-  url: "/room/validate-name",
-  data: { name: props.name },
-  immediate: true,
-});
-
-if (error.value) {
-  router.push({ name: "main" });
-}
 </script>
 
 <template>
