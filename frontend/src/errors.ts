@@ -1,7 +1,7 @@
 import { type GenericError } from "@/api";
 
 export function silenceApiError(error: GenericError) {
-  silenceError(combine(error.generic, "Silent API errors"));
+  silenceError(combine(error.generic, "Silent API errors:"));
 }
 
 function silenceError(error: Error | string) {
