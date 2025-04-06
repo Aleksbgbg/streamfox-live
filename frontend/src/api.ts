@@ -11,7 +11,7 @@ type KVMap = Record<string, unknown>;
 const instance = axios.create();
 
 export async function useFetch<Data, Error = GenericError>(params: {
-  method: "get" | "post" | "put" | "delete";
+  method: "get" | "post" | "put" | "patch" | "delete";
   url: string;
   data?: KVMap;
   immediate: boolean;
