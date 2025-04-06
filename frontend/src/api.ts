@@ -40,7 +40,15 @@ export async function useFetch<Data, Error = GenericError>(params: {
       })
       .catch((err) => {
         clear();
-        error.value = err.response.data;
+
+        if (typeof err.response.data === "string") {
+          error.value = {
+            generic: [`Request failed with code ${err.status} (${err.code}).`],
+            specific: {},
+          };
+        } else {
+          error.value = err.response.data;
+        }
       });
 
     pending.value = false;
