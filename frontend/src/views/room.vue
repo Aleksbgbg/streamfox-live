@@ -1,9 +1,47 @@
 <script setup lang="ts">
+import { computed, ref } from "vue";
 import { UserIcon } from "@heroicons/vue/24/solid";
 
 defineProps<{
   name: string;
 }>();
+
+enum Connection {
+  Disconnected,
+  Connecting,
+  Connected,
+  Error,
+}
+
+enum Channel {
+  Closed,
+  Open,
+}
+
+const connectionState = ref(Connection.Disconnected);
+const channelState = ref(Channel.Closed);
+
+const statusStyle = computed(() => {
+  switch (connectionState.value) {
+    case Connection.Error:
+    case Connection.Disconnected:
+      return "status-error";
+    case Connection.Connecting:
+      return "status-warning";
+    case Connection.Connected:
+      return "status-success";
+    default:
+      return undefined;
+  }
+});
+const connectionActivity = computed(
+  () =>
+    connectionState.value === Connection.Disconnected ||
+    connectionState.value === Connection.Connecting,
+);
+
+const peers = ref(0);
+const users = computed(() => peers.value + (channelState.value === Channel.Open ? 1 : 0));
 </script>
 
 <template>
@@ -17,7 +55,18 @@ defineProps<{
     <div class="flex">
       <div class="mx-auto">
         <div class="indicator">
-          <span class="indicator-item badge badge-secondary">0</span>
+          <div class="indicator-item indicator-start inline-grid *:[grid-area:1/1]">
+            <div
+              class="status status-lg animate-ping"
+              :class="statusStyle"
+              v-show="connectionActivity"></div>
+            <div class="status status-lg" :class="statusStyle"></div>
+          </div>
+          <span
+            class="indicator-item badge"
+            :class="channelState === Channel.Open ? 'badge-secondary' : 'badge-warning'"
+            >{{ users }}</span
+          >
           <button class="btn btn-neutral btn-square">
             <UserIcon class="size-6" />
           </button>
