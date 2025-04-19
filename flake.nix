@@ -15,6 +15,17 @@
     packages = forAllSystems (
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
+        frontend = pkgs.buildNpmPackage {
+          pname = "frontend";
+          version = "0.0.0";
+
+          src = ./frontend/.;
+          npmDeps = pkgs.importNpmLock {
+            npmRoot = ./frontend/.;
+          };
+
+          npmConfigHook = pkgs.importNpmLock.npmConfigHook;
+        };
       in {
         default = pkgs.rustPlatform.buildRustPackage {
           pname = "backend";
@@ -22,6 +33,10 @@
 
           src = nixpkgs.lib.cleanSource ./backend/.;
           cargoLock.lockFile = ./backend/Cargo.lock;
+
+          postInstall = ''
+            cp -r ${frontend}/lib/node_modules/frontend/dist $out/bin/frontend
+          '';
         };
       }
     );
