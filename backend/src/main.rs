@@ -2,10 +2,12 @@ mod controllers;
 
 use crate::controllers::room;
 use axum::{Router, routing};
+use std::env;
 use std::net::SocketAddr;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::{select, signal};
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::{Level, error, info};
 
@@ -13,6 +15,10 @@ use tracing::{Level, error, info};
 enum AppError {
   #[error("could not bind to network interface: {0}")]
   BindTcpListener(std::io::Error),
+  #[error("could not get path to current executable: {0}")]
+  GetCurrentExe(std::io::Error),
+  #[error("could not get frontend static files directory")]
+  GetFrontendDir,
   #[error("could not get TCP listener address: {0}")]
   GetListenerAddress(std::io::Error),
   #[error("could not start Axum server: {0}")]
@@ -29,11 +35,21 @@ async fn start() -> Result<(), AppError> {
     "/room",
     Router::new().route("/validate-name", routing::post(room::validate_name)),
   );
-  let app = Router::new().nest("/api", api).layer(
-    TraceLayer::new_for_http()
-      .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-      .on_response(DefaultOnResponse::new().level(Level::INFO)),
-  );
+  let app = Router::new()
+    .fallback_service({
+      let mut path = env::current_exe().map_err(AppError::GetCurrentExe)?;
+      path.pop();
+      path.push("frontend");
+      path.push("index.html");
+
+      ServeDir::new(path.parent().ok_or(AppError::GetFrontendDir)?).fallback(ServeFile::new(path))
+    })
+    .nest("/api", api)
+    .layer(
+      TraceLayer::new_for_http()
+        .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+        .on_response(DefaultOnResponse::new().level(Level::INFO)),
+    );
 
   info!(
     "backend listening on {}",
