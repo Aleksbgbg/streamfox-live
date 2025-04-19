@@ -1,4 +1,5 @@
 mod controllers;
+
 use crate::controllers::room;
 use axum::{Router, routing};
 use std::net::SocketAddr;
