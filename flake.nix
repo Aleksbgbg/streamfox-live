@@ -40,5 +40,31 @@
         };
       }
     );
+
+    nixosModules.default = {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
+      with lib; let
+        description = "WebRTC screen sharing server";
+        cfg = config.services.streamfoxLive;
+      in {
+        options.services.streamfoxLive.enable = mkEnableOption description;
+
+        config = mkIf cfg.enable {
+          systemd.services.streamfox-live = {
+            inherit description;
+            wantedBy = ["multi-user.target"];
+
+            serviceConfig = {
+              ExecStart = "${self.packages.${pkgs.system}.default}/bin/backend";
+              Restart = "always";
+              Type = "exec";
+            };
+          };
+        };
+      };
   };
 }
