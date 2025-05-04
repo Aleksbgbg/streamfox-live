@@ -45,6 +45,32 @@ pub enum HandlerError {
   JsonRejection(#[from] JsonRejection),
   #[error("Some inputs failed validation.")]
   Validation(#[from] ValidationErrors),
+  #[error("Could not set remote description: {0}.")]
+  SetRemoteDescription(webrtc::Error),
+  #[error("Could not create answer: {0}.")]
+  CreateAnswer(webrtc::Error),
+  #[error("Could not add trickle ICE candidate: {0}.")]
+  AddIceCandidate(webrtc::Error),
+
+  #[error("Room '{0}' does not exist.")]
+  RoomNotFound(String),
+  #[error("Session '{0}' does not exist.")]
+  SessionNotFound(usize),
+
+  #[error("Could not register default interceptors: {0}.")]
+  RegisterDefaultInterceptors(webrtc::Error),
+  #[error("Could not create a peer connection: {0}.")]
+  CreatePeerConnection(webrtc::Error),
+  #[error("Could not set local description: {0}.")]
+  SetLocalDescription(webrtc::Error),
+  #[error("Could not get local description.")]
+  GetLocalDescription,
+  #[error("Could not send message to channel (all receivers dropped).")]
+  SendMessage,
+  #[error("Could not receive message from channel (all senders dropped): {0}.")]
+  ReceiveMessage(#[from] flume::RecvError),
+  #[error("Room continuously exited before receiving message and max retry count was reached.")]
+  SendMessageMaxRetryReached,
 }
 
 impl HandlerError {
@@ -95,7 +121,6 @@ fn format_error_messages(field: &str, errors: &ValidationErrorsKind) -> Vec<Stri
 impl IntoResponse for HandlerError {
   fn into_response(self) -> Response {
     match self {
-      HandlerError::JsonRejection(_) => self.as_generic(StatusCode::BAD_REQUEST),
       HandlerError::Validation(ref validation_errors) => (StatusCode::BAD_REQUEST, {
         let mut errors = Errors::generic(self.to_string());
         for (k, v) in validation_errors.errors() {
@@ -103,6 +128,24 @@ impl IntoResponse for HandlerError {
         }
         errors
       }),
+      HandlerError::JsonRejection(_)
+      | HandlerError::SetRemoteDescription(_)
+      | HandlerError::CreateAnswer(_)
+      | HandlerError::AddIceCandidate(_) => self.as_generic(StatusCode::BAD_REQUEST),
+
+      HandlerError::RoomNotFound(_) | HandlerError::SessionNotFound(_) => {
+        self.as_generic(StatusCode::NOT_FOUND)
+      }
+
+      HandlerError::RegisterDefaultInterceptors(_)
+      | HandlerError::CreatePeerConnection(_)
+      | HandlerError::SetLocalDescription(_)
+      | HandlerError::GetLocalDescription
+      | HandlerError::SendMessage
+      | HandlerError::ReceiveMessage(_)
+      | HandlerError::SendMessageMaxRetryReached => {
+        self.as_generic(StatusCode::INTERNAL_SERVER_ERROR)
+      }
     }
     .into_response()
   }

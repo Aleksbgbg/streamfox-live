@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { UserIcon } from "@heroicons/vue/24/solid";
+import { useFetch } from "@/api";
+import { assertNotNull, reportApiError } from "@/errors";
+import { config, dataChannelMessageToString } from "@/webrtc";
 
-defineProps<{
+const props = defineProps<{
   name: string;
 }>();
 
@@ -42,6 +45,101 @@ const connectionActivity = computed(
 
 const peers = ref(0);
 const users = computed(() => (channelState.value === Channel.Open ? peers.value + 1 : 0));
+
+function closeChannel() {
+  peers.value = 0;
+  channelState.value = Channel.Closed;
+}
+
+enum EventType {
+  UserJoined,
+  UserLeft,
+}
+
+interface Event {
+  type: EventType;
+}
+
+onMounted(async () => {
+  const connection = new RTCPeerConnection(config);
+  const channel = connection.createDataChannel("main");
+  const offer = await connection.createOffer();
+
+  const { data, error } = await useFetch<{ sessionId: string; sdp: string }>({
+    method: "post",
+    url: `/room/${props.name}/session`,
+    data: {
+      sdp: offer.sdp,
+    },
+    immediate: true,
+  });
+
+  if (error.value) {
+    reportApiError(error.value);
+    return;
+  }
+
+  const response = assertNotNull(data.value);
+
+  connection.addEventListener("connectionstatechange", function () {
+    switch (connection.connectionState) {
+      case "new":
+      case "connecting":
+        connectionState.value = Connection.Connecting;
+        break;
+      case "connected":
+        connectionState.value = Connection.Connected;
+        break;
+      case "disconnected":
+      case "closed":
+        closeChannel();
+        connectionState.value = Connection.Disconnected;
+        break;
+      case "failed":
+        closeChannel();
+        connectionState.value = Connection.Error;
+        break;
+    }
+  });
+  connection.addEventListener("icecandidate", async function (event) {
+    if (event.candidate === null) {
+      return;
+    }
+
+    const { error } = await useFetch<{ sdp: string }>({
+      method: "patch",
+      url: `/room/${props.name}/session/${response.sessionId}`,
+      data: {
+        candidate: event.candidate.toJSON(),
+      },
+      immediate: true,
+    });
+
+    if (error.value) {
+      reportApiError(error.value);
+    }
+  });
+
+  channel.addEventListener("open", function () {
+    channelState.value = Channel.Open;
+  });
+  channel.addEventListener("close", closeChannel);
+  channel.addEventListener("message", async function (event) {
+    const message: Event = JSON.parse(await dataChannelMessageToString(event.data));
+
+    switch (message.type) {
+      case EventType.UserJoined:
+        ++peers.value;
+        break;
+      case EventType.UserLeft:
+        --peers.value;
+        break;
+    }
+  });
+
+  await connection.setLocalDescription(offer);
+  await connection.setRemoteDescription({ type: "answer", sdp: response.sdp });
+});
 </script>
 
 <template>

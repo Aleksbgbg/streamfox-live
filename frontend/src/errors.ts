@@ -1,5 +1,21 @@
 import { type GenericError } from "@/api";
 
+export function assertNotNull<T>(value: T | undefined | null): T {
+  if (value === undefined || value === null) {
+    throw new Error("precondition failed: value is null");
+  }
+
+  return value;
+}
+
+export function reportApiError(error: GenericError) {
+  reportError(combine(error.generic, "API errors:"));
+}
+
+function reportError(error: Error | string) {
+  console.error(error);
+}
+
 export function silenceApiError(error: GenericError) {
   silenceError(combine(error.generic, "Silent API errors:"));
 }

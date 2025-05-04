@@ -1,8 +1,10 @@
 mod controllers;
 
 use crate::controllers::room;
+use crate::controllers::room::Room;
 use axum::{Router, routing};
 use clap::Parser;
+use dashmap::DashMap;
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -49,16 +51,15 @@ enum AppError {
   ServeApp(std::io::Error),
 }
 
-#[allow(dead_code)]
 #[derive(Default)]
 struct WebRtcAppConfig {
   settings: SettingEngine,
 }
 
-#[allow(dead_code)]
 #[derive(Default)]
 struct AppState {
   webrtc: WebRtcAppConfig,
+  rooms: Arc<DashMap<String, Room>>,
 }
 
 fn create_webrtc_app_config(args: &Args) -> Result<WebRtcAppConfig, AppError> {
@@ -79,12 +80,15 @@ async fn start(args: &Args) -> Result<(), AppError> {
     .map_err(AppError::BindTcpListener)?;
 
   let api = Router::new()
-    .nest(
-      "/room",
-      Router::new().route("/validate-name", routing::post(room::validate_name)),
+    .route("/room/validate-name", routing::post(room::validate_name))
+    .route("/room/{name}/session", routing::post(room::create_session))
+    .route(
+      "/room/{name}/session/{session_id}",
+      routing::patch(room::trickle_ice_candidate),
     )
     .with_state(Arc::new(AppState {
       webrtc: create_webrtc_app_config(args)?,
+      rooms: Arc::new(DashMap::default()),
     }));
   let app = Router::new()
     .fallback_service({
