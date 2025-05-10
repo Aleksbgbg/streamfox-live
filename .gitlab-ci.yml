@@ -26,6 +26,7 @@ backend-format:
   needs: []
   script:
     - cd backend
+    - rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt
     - cargo fmt --check
 
 backend-clippy:
@@ -34,6 +35,7 @@ backend-clippy:
   needs: []
   script:
     - cd backend
+    - rustup component add --toolchain nightly-x86_64-unknown-linux-gnu clippy
     - cargo clippy -- -Dwarnings
 
 frontend-format:
