@@ -51,7 +51,24 @@
         description = "WebRTC screen sharing server";
         cfg = config.services.streamfoxLive;
       in {
-        options.services.streamfoxLive.enable = mkEnableOption description;
+        options.services.streamfoxLive = {
+          enable = mkEnableOption description;
+
+          publicIp = mkOption {
+            type = lib.types.str;
+            description = "Public IP address to use for the WebRTC ICE host candidate";
+          };
+
+          portMin = mkOption {
+            type = lib.types.ints.u16;
+            description = "Minimum UDP port to use for WebRTC connections (inclusive)";
+          };
+
+          portMax = mkOption {
+            type = lib.types.ints.u16;
+            description = "Maximum UDP port to use for WebRTC connections (inclusive)";
+          };
+        };
 
         config = mkIf cfg.enable {
           systemd.services.streamfox-live = {
@@ -59,7 +76,11 @@
             wantedBy = ["multi-user.target"];
 
             serviceConfig = {
-              ExecStart = "${self.packages.${pkgs.system}.default}/bin/backend";
+              ExecStart =
+                "${self.packages.${pkgs.system}.default}/bin/backend " +
+                "--public-ip ${cfg.publicIp} " +
+                "--port-min ${toString cfg.portMin} " +
+                "--port-max ${toString cfg.portMax}";
               Restart = "always";
               Type = "exec";
             };

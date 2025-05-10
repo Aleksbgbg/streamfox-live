@@ -2,19 +2,43 @@ mod controllers;
 
 use crate::controllers::room;
 use axum::{Router, routing};
+use clap::Parser;
 use std::env;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::{select, signal};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::{Level, error, info};
+use webrtc::api::setting_engine::SettingEngine;
+use webrtc::ice::udp_network::{EphemeralUDP, UDPNetwork};
+use webrtc::ice_transport::ice_candidate_type::RTCIceCandidateType;
+
+/// WebRTC screen sharing server
+#[derive(Debug, Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+  /// Public IP address to use for the WebRTC ICE host candidate
+  #[arg(long)]
+  public_ip: String,
+
+  /// Minimum UDP port to use for WebRTC connections (inclusive)
+  #[arg(long)]
+  port_min: u16,
+
+  /// Maximum UDP port to use for WebRTC connections (inclusive)
+  #[arg(long)]
+  port_max: u16,
+}
 
 #[derive(Debug, Error)]
 enum AppError {
   #[error("could not bind to network interface: {0}")]
   BindTcpListener(std::io::Error),
+  #[error("could not create ephemeral UDP port range: {0}")]
+  CreateEphemeralUdpPortRange(webrtc::ice::Error),
   #[error("could not get path to current executable: {0}")]
   GetCurrentExe(std::io::Error),
   #[error("could not get frontend static files directory")]
@@ -25,16 +49,43 @@ enum AppError {
   ServeApp(std::io::Error),
 }
 
+#[allow(dead_code)]
+#[derive(Default)]
+struct WebRtcAppConfig {
+  settings: SettingEngine,
+}
+
+#[allow(dead_code)]
+#[derive(Default)]
+struct AppState {
+  webrtc: WebRtcAppConfig,
+}
+
+fn create_webrtc_app_config(args: &Args) -> Result<WebRtcAppConfig, AppError> {
+  let mut settings = SettingEngine::default();
+  settings.set_nat_1to1_ips(vec![args.public_ip.clone()], RTCIceCandidateType::Host);
+  settings.set_udp_network(UDPNetwork::Ephemeral(
+    EphemeralUDP::new(args.port_min, args.port_max)
+      .map_err(AppError::CreateEphemeralUdpPortRange)?,
+  ));
+
+  Ok(WebRtcAppConfig { settings })
+}
+
 #[tokio::main]
-async fn start() -> Result<(), AppError> {
+async fn start(args: &Args) -> Result<(), AppError> {
   let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], 8001)))
     .await
     .map_err(AppError::BindTcpListener)?;
 
-  let api = Router::new().nest(
-    "/room",
-    Router::new().route("/validate-name", routing::post(room::validate_name)),
-  );
+  let api = Router::new()
+    .nest(
+      "/room",
+      Router::new().route("/validate-name", routing::post(room::validate_name)),
+    )
+    .with_state(Arc::new(AppState {
+      webrtc: create_webrtc_app_config(args)?,
+    }));
   let app = Router::new()
     .fallback_service({
       let mut path = env::current_exe().map_err(AppError::GetCurrentExe)?;
@@ -52,10 +103,14 @@ async fn start() -> Result<(), AppError> {
     );
 
   info!(
-    "backend listening on {}",
+    "[TCP] HTTP listening on {}",
     listener
       .local_addr()
       .map_err(AppError::GetListenerAddress)?
+  );
+  info!(
+    "[UDP] WebRTC listening on {}:[{}, {}]",
+    args.public_ip, args.port_min, args.port_max,
   );
 
   axum::serve(listener, app)
@@ -67,6 +122,8 @@ async fn start() -> Result<(), AppError> {
 }
 
 fn main() {
+  let args = Args::parse();
+
   tracing_subscriber::fmt()
     .with_target(false)
     .compact()
@@ -75,7 +132,7 @@ fn main() {
 
   info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
-  match start() {
+  match start(&args) {
     Ok(_) => info!("app exited successfully"),
     Err(err) => error!("app exited due to error: {}", err),
   }
