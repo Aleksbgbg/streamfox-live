@@ -59,6 +59,7 @@ fn format_error_messages(field: &str, errors: &ValidationErrorsKind) -> Vec<Stri
     ValidationErrorsKind::Field(errors) => errors
       .iter()
       .map(|e| match e.code.as_ref() {
+        #[allow(clippy::uninlined_format_args)]
         "email" => format!("{} must be a valid email address.", title),
         "must_match" => format!(
           "{} must be identical to {}.",
