@@ -135,7 +135,7 @@ fn main() {
   match start(&args) {
     Ok(_) => info!("app exited successfully"),
     Err(err) => error!("app exited due to error: {}", err),
-  }
+  };
 }
 
 async fn shutdown_signal() {
