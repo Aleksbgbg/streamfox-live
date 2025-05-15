@@ -8,9 +8,9 @@ opt-level = 2
 lto = "thin"
 
 [dependencies]
-axum = { version = "0.8.1", default-features = false, features = ["http1", "json", "tokio"] }
+axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "tokio"] }
 bytes = { version = "1.10.1", default-features = false }
-clap = { version = "4.5.37", features = ["derive"] }
+clap = { version = "4.5.38", features = ["derive"] }
 convert_case = { version = "0.8.0", default-features = false }
 dashmap = { version = "6.1.0", default-features = false }
 flume = { version = "0.11.1" }
@@ -19,9 +19,9 @@ serde = { version = "1.0.219", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.140", default-features = false }
 serde_repr = { version = "0.1.20", default-features = false }
 thiserror = { version = "2.0.12", default-features = false }
-tokio = { version = "1.44.1", default-features = false, features = ["macros", "net", "rt-multi-thread", "signal"] }
-tower-http = { version = "0.6.2", default-features = false, features = ["fs", "trace"] }
+tokio = { version = "1.45.0", default-features = false, features = ["macros", "net", "rt-multi-thread", "signal"] }
+tower-http = { version = "0.6.4", default-features = false, features = ["fs", "trace"] }
 tracing = { version = "0.1.41", default-features = false }
 tracing-subscriber = { version = "0.3.19", default-features = false, features = ["ansi", "fmt"] }
 validator = { version = "0.20.0", default-features = false, features = ["derive"] }
-webrtc = { version = "0.12.0" }
+webrtc = { version = "0.13.0" }
