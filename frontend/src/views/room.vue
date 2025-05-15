@@ -41,7 +41,7 @@ const connectionActivity = computed(
 );
 
 const peers = ref(0);
-const users = computed(() => peers.value + (channelState.value === Channel.Open ? 1 : 0));
+const users = computed(() => (channelState.value === Channel.Open ? peers.value + 1 : 0));
 </script>
 
 <template>
