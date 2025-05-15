@@ -86,6 +86,10 @@ async fn start(args: &Args) -> Result<(), AppError> {
       "/room/{name}/session/{session_id}",
       routing::patch(room::trickle_ice_candidate),
     )
+    .route(
+      "/room/{name}/session/{session_id}",
+      routing::post(room::renegotiate_session),
+    )
     .with_state(Arc::new(AppState {
       webrtc: create_webrtc_app_config(args)?,
       rooms: Arc::new(DashMap::default()),

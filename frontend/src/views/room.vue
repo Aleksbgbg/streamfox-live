@@ -60,27 +60,86 @@ interface Event {
   type: EventType;
 }
 
-onMounted(async () => {
-  const connection = new RTCPeerConnection(config);
-  const channel = connection.createDataChannel("main");
-  const offer = await connection.createOffer();
+interface CreateSessionResponse {
+  sessionId: string;
+  sdp: string;
+}
 
-  const { data, error } = await useFetch<{ sessionId: string; sdp: string }>({
+async function createSession(roomName: string, sdp: string): Promise<CreateSessionResponse | null> {
+  const { data, error } = await useFetch<CreateSessionResponse>({
     method: "post",
-    url: `/room/${props.name}/session`,
+    url: `/room/${roomName}/session`,
     data: {
-      sdp: offer.sdp,
+      sdp,
     },
     immediate: true,
   });
 
   if (error.value) {
     reportApiError(error.value);
-    return;
+    return null;
   }
 
-  const response = assertNotNull(data.value);
+  return assertNotNull(data.value);
+}
 
+interface RenegotiateSessionResponse {
+  sdp: string;
+}
+
+async function renegotiateSession(
+  roomName: string,
+  sessionId: string,
+  sdp: string,
+): Promise<RenegotiateSessionResponse | null> {
+  const { data, error } = await useFetch<RenegotiateSessionResponse>({
+    method: "post",
+    url: `/room/${roomName}/session/${sessionId}`,
+    data: {
+      sdp,
+    },
+    immediate: true,
+  });
+
+  if (error.value) {
+    reportApiError(error.value);
+    return null;
+  }
+
+  return assertNotNull(data.value);
+}
+
+onMounted(async () => {
+  const connection = new RTCPeerConnection(config);
+
+  let sessionId: string | null = null;
+
+  connection.addEventListener("negotiationneeded", async function () {
+    const offer = await connection.createOffer();
+
+    let answerSdp;
+    if (sessionId === null) {
+      const answer = await createSession(props.name, assertNotNull(offer.sdp));
+
+      if (answer === null) {
+        return;
+      }
+
+      sessionId = answer.sessionId;
+      answerSdp = answer.sdp;
+    } else {
+      const answer = await renegotiateSession(props.name, sessionId, assertNotNull(offer.sdp));
+
+      if (answer === null) {
+        return;
+      }
+
+      answerSdp = answer.sdp;
+    }
+
+    await connection.setLocalDescription(offer);
+    await connection.setRemoteDescription({ type: "answer", sdp: answerSdp });
+  });
   connection.addEventListener("connectionstatechange", function () {
     switch (connection.connectionState) {
       case "new":
@@ -108,7 +167,7 @@ onMounted(async () => {
 
     const { error } = await useFetch<{ sdp: string }>({
       method: "patch",
-      url: `/room/${props.name}/session/${response.sessionId}`,
+      url: `/room/${props.name}/session/${sessionId}`,
       data: {
         candidate: event.candidate.toJSON(),
       },
@@ -120,6 +179,7 @@ onMounted(async () => {
     }
   });
 
+  const channel = connection.createDataChannel("main");
   channel.addEventListener("open", function () {
     channelState.value = Channel.Open;
   });
@@ -136,9 +196,6 @@ onMounted(async () => {
         break;
     }
   });
-
-  await connection.setLocalDescription(offer);
-  await connection.setRemoteDescription({ type: "answer", sdp: response.sdp });
 });
 </script>
 

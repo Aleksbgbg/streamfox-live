@@ -144,6 +144,78 @@ pub async fn create_session(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RenegotiateSessionRequest {
+  sdp: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RenegotiateSessionResponse {
+  sdp: String,
+}
+
+pub async fn renegotiate_session(
+  State(state): State<Arc<AppState>>,
+  Path((room_name, session_id)): Path<(String, SessionId)>,
+  Json(request): Json<RenegotiateSessionRequest>,
+) -> Result<impl IntoResponse, HandlerError> {
+  let receiver = {
+    let (sender, receiver) = flume::bounded(1);
+
+    let room = state
+      .rooms
+      .get(&room_name)
+      .ok_or_else(|| HandlerError::RoomNotFound(room_name))?;
+
+    room
+      .channel
+      .send_async(Message::GetSessionPeerConnection {
+        session_id,
+        response: sender,
+      })
+      .await
+      .map_err(|_| HandlerError::SendMessage)?;
+
+    receiver
+  };
+
+  let response = receiver.recv_async().await??;
+
+  let peer_connection = response.peer_connection;
+
+  let mut gather_complete = peer_connection.gathering_complete_promise().await;
+
+  let mut offer = RTCSessionDescription::default();
+  offer.sdp_type = RTCSdpType::Offer;
+  offer.sdp = request.sdp;
+  peer_connection
+    .set_remote_description(offer)
+    .await
+    .map_err(HandlerError::SetRemoteDescription)?;
+
+  let answer = peer_connection
+    .create_answer(None)
+    .await
+    .map_err(HandlerError::CreateAnswer)?;
+
+  peer_connection
+    .set_local_description(answer)
+    .await
+    .map_err(HandlerError::SetLocalDescription)?;
+
+  gather_complete.recv().await;
+
+  let sdp = peer_connection
+    .local_description()
+    .await
+    .ok_or(HandlerError::GetLocalDescription)?
+    .sdp;
+
+  Ok(Json(RenegotiateSessionResponse { sdp }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TrickleIceCandidateRequest {
   candidate: RTCIceCandidateInit,
 }
