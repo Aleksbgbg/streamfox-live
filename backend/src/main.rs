@@ -90,6 +90,11 @@ async fn start(args: &Args) -> Result<(), AppError> {
       "/room/{name}/session/{session_id}",
       routing::post(room::renegotiate_session),
     )
+    .route("/room/{name}/stream", routing::post(room::create_stream))
+    .route(
+      "/room/{name}/stream/{stream_id}",
+      routing::delete(room::destroy_stream),
+    )
     .with_state(Arc::new(AppState {
       webrtc: create_webrtc_app_config(args)?,
       rooms: Arc::new(DashMap::default()),

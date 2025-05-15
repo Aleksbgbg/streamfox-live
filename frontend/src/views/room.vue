@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { type Ref, computed, onMounted, ref } from "vue";
 import { UserIcon } from "@heroicons/vue/24/solid";
 import { useFetch } from "@/api";
 import { assertNotNull, reportApiError } from "@/errors";
@@ -46,6 +46,10 @@ const connectionActivity = computed(
 const peers = ref(0);
 const users = computed(() => (channelState.value === Channel.Open ? peers.value + 1 : 0));
 
+const streaming = ref(false);
+
+const video: Ref<HTMLVideoElement | null> = ref(null);
+
 function closeChannel() {
   peers.value = 0;
   channelState.value = Channel.Closed;
@@ -54,10 +58,22 @@ function closeChannel() {
 enum EventType {
   UserJoined,
   UserLeft,
+  StreamStarted,
+  StreamEnded,
+}
+
+interface StreamStartedPayload {
+  streamId: string;
+}
+
+interface StreamEndedPayload {
+  streamId: string;
 }
 
 interface Event {
   type: EventType;
+  streamStartedPayload: StreamStartedPayload;
+  streamEndedPayload: StreamEndedPayload;
 }
 
 interface CreateSessionResponse {
@@ -107,6 +123,12 @@ async function renegotiateSession(
   }
 
   return assertNotNull(data.value);
+}
+
+interface Stream {
+  videoTransceiver: RTCRtpTransceiver;
+  audioTransceiver: RTCRtpTransceiver;
+  mediaStream: MediaStream;
 }
 
 onMounted(async () => {
@@ -179,6 +201,9 @@ onMounted(async () => {
     }
   });
 
+  const streams = new Map<string, Stream>();
+  let currentStreamId: string | null = null;
+
   const channel = connection.createDataChannel("main");
   channel.addEventListener("open", function () {
     channelState.value = Channel.Open;
@@ -194,6 +219,45 @@ onMounted(async () => {
       case EventType.UserLeft:
         --peers.value;
         break;
+      case EventType.StreamStarted:
+        {
+          const streamId = message.streamStartedPayload.streamId;
+
+          const videoTransceiver = connection.addTransceiver("video", { direction: "recvonly" });
+          const audioTransceiver = connection.addTransceiver("audio", { direction: "recvonly" });
+          const mediaStream = new MediaStream();
+
+          mediaStream.addTrack(videoTransceiver.receiver.track);
+          mediaStream.addTrack(audioTransceiver.receiver.track);
+
+          streams.set(streamId, {
+            audioTransceiver,
+            videoTransceiver,
+            mediaStream,
+          });
+
+          assertNotNull(video.value).srcObject = mediaStream;
+          currentStreamId = streamId;
+          streaming.value = true;
+        }
+        break;
+      case EventType.StreamEnded:
+        {
+          const streamId = message.streamEndedPayload.streamId;
+
+          if (currentStreamId === streamId) {
+            streaming.value = false;
+            currentStreamId = null;
+            assertNotNull(video.value).srcObject = null;
+          }
+
+          const stream = assertNotNull(streams.get(streamId));
+          streams.delete(streamId);
+
+          stream.audioTransceiver.stop();
+          stream.videoTransceiver.stop();
+        }
+        break;
     }
   });
 });
@@ -204,8 +268,9 @@ onMounted(async () => {
     <div>
       <h1 class="text-center text-2xl font-bold">{{ name }}</h1>
     </div>
-    <div class="flex grow flex-col">
-      <p class="my-auto text-center text-xl">no active stream</p>
+    <div class="flex min-h-0 min-w-0 grow items-center justify-center pt-2 pb-5">
+      <video v-show="streaming" ref="video" class="max-h-full max-w-full" autoplay />
+      <p v-show="!streaming" class="text-center text-xl">no active stream</p>
     </div>
     <div class="flex">
       <div class="mx-auto">

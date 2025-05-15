@@ -57,10 +57,16 @@ pub enum HandlerError {
   #[error("Session '{0}' does not exist.")]
   SessionNotFound(usize),
 
+  #[error("Could not register default codecs: {0}.")]
+  RegisterDefaultCodecs(webrtc::Error),
   #[error("Could not register default interceptors: {0}.")]
   RegisterDefaultInterceptors(webrtc::Error),
   #[error("Could not create a peer connection: {0}.")]
   CreatePeerConnection(webrtc::Error),
+  #[error("Could not add video transceiver: {0}.")]
+  AddVideoTransceiver(webrtc::Error),
+  #[error("Could not add audio transceiver: {0}.")]
+  AddAudioTransceiver(webrtc::Error),
   #[error("Could not set local description: {0}.")]
   SetLocalDescription(webrtc::Error),
   #[error("Could not get local description.")]
@@ -137,8 +143,11 @@ impl IntoResponse for HandlerError {
         self.as_generic(StatusCode::NOT_FOUND)
       }
 
-      HandlerError::RegisterDefaultInterceptors(_)
+      HandlerError::RegisterDefaultCodecs(_)
+      | HandlerError::RegisterDefaultInterceptors(_)
       | HandlerError::CreatePeerConnection(_)
+      | HandlerError::AddVideoTransceiver(_)
+      | HandlerError::AddAudioTransceiver(_)
       | HandlerError::SetLocalDescription(_)
       | HandlerError::GetLocalDescription
       | HandlerError::SendMessage
