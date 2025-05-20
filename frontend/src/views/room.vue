@@ -46,6 +46,7 @@ const connectionActivity = computed(
 const peers = ref(0);
 const users = computed(() => (channelState.value === Channel.Open ? peers.value + 1 : 0));
 
+const loading = ref(false);
 const streaming = ref(false);
 
 const video: Ref<HTMLVideoElement | null> = ref(null);
@@ -132,6 +133,8 @@ interface Stream {
 }
 
 onMounted(async () => {
+  assertNotNull(video.value).addEventListener("canplay", () => (loading.value = false));
+
   const connection = new RTCPeerConnection(config);
 
   let sessionId: string | null = null;
@@ -238,6 +241,7 @@ onMounted(async () => {
 
           assertNotNull(video.value).srcObject = mediaStream;
           currentStreamId = streamId;
+          loading.value = true;
           streaming.value = true;
         }
         break;
@@ -269,7 +273,10 @@ onMounted(async () => {
       <h1 class="text-center text-2xl font-bold">{{ name }}</h1>
     </div>
     <div class="flex min-h-0 min-w-0 grow items-center justify-center pt-2 pb-5">
-      <video v-show="streaming" ref="video" class="max-h-full max-w-full" autoplay />
+      <div v-show="streaming" class="contents">
+        <span v-show="loading" class="loading loading-infinity text-primary h-16 w-16"></span>
+        <video v-show="!loading" ref="video" class="max-h-full max-w-full" autoplay />
+      </div>
       <p v-show="!streaming" class="text-center text-2xl">no active stream</p>
     </div>
     <div class="flex">
