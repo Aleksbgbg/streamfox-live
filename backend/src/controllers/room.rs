@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::controllers::errors::{HandlerError, ValidatedJson};
+use crate::refcount::{Ref, Refcount};
 use axum::Json;
 use axum::extract::{OriginalUri, Path, State};
 use axum::http::{StatusCode, header};
@@ -31,8 +32,6 @@ use webrtc::track::track_remote::TrackRemote;
 
 const THIRD_PARTY_REMOVAL_ERR: &str =
   "another execution context removed this room from the global map";
-
-const MAX_RETRY_COUNT: u32 = 3;
 
 const STREAM_TRACK_COUNT: usize = 2;
 
@@ -124,35 +123,36 @@ pub async fn create_session(
     .sdp;
 
   let (sender, receiver) = flume::bounded(1);
-  for _ in 0..MAX_RETRY_COUNT {
-    {
-      let room = state
-        .rooms
-        .entry(room_name.clone())
-        .or_insert_with(|| Room::spawn(Arc::clone(&state.rooms), room_name.clone()))
-        .downgrade();
+  loop {
+    let room = state
+      .rooms
+      .entry(room_name.clone())
+      .or_insert_with(|| Room::spawn(Arc::clone(&state.rooms), room_name.clone()))
+      .downgrade();
+
+    if let Some(r#ref) = room.refcount.try_get() {
       room
         .channel
         .send_async(Message::CreateSession {
           peer_connection: Arc::clone(&peer_connection),
           response: sender.clone(),
+          _ref: r#ref,
         })
         .await
         .map_err(|_| HandlerError::SendMessage)?;
-    }
-
-    if let Ok(response) = receiver.recv_async().await {
-      return Ok((
-        StatusCode::CREATED,
-        Json(CreateSessionResponse {
-          session_id: response?.session_id.to_string(),
-          sdp,
-        }),
-      ));
+      break;
     }
   }
 
-  Err(HandlerError::SendMessageMaxRetryReached)
+  let response = receiver.recv_async().await??;
+
+  Ok((
+    StatusCode::CREATED,
+    Json(CreateSessionResponse {
+      session_id: response.session_id.to_string(),
+      sdp,
+    }),
+  ))
 }
 
 #[derive(Deserialize)]
@@ -332,36 +332,34 @@ pub async fn create_stream(
     .sdp;
 
   let (sender, receiver) = flume::bounded(1);
-  for _ in 0..MAX_RETRY_COUNT {
-    {
-      let room = state
-        .rooms
-        .entry(room_name.clone())
-        .or_insert_with(|| Room::spawn(Arc::clone(&state.rooms), room_name.clone()))
-        .downgrade();
+  loop {
+    let room = state
+      .rooms
+      .entry(room_name.clone())
+      .or_insert_with(|| Room::spawn(Arc::clone(&state.rooms), room_name.clone()))
+      .downgrade();
+
+    if let Some(r#ref) = room.refcount.try_get() {
       room
         .channel
         .send_async(Message::CreateStream {
           peer_connection: Arc::clone(&peer_connection),
           response: sender.clone(),
+          _ref: r#ref,
         })
         .await
         .map_err(|_| HandlerError::SendMessage)?;
-    }
-
-    if let Ok(response) = receiver.recv_async().await {
-      return Ok((
-        StatusCode::CREATED,
-        [(
-          header::LOCATION,
-          format!("{}/{}", path, response?.stream_id),
-        )],
-        sdp,
-      ));
+      break;
     }
   }
 
-  Err(HandlerError::SendMessageMaxRetryReached)
+  let response = receiver.recv_async().await??;
+
+  Ok((
+    StatusCode::CREATED,
+    [(header::LOCATION, format!("{}/{}", path, response.stream_id))],
+    sdp,
+  ))
 }
 
 pub async fn destroy_stream(
@@ -383,18 +381,22 @@ pub async fn destroy_stream(
 }
 
 pub struct Room {
+  refcount: Refcount,
   pub channel: Sender<Message>,
 }
 
 impl Room {
   fn spawn(rooms: Arc<DashMap<String, Room>>, name: String) -> Self {
+    let refcount = Refcount::new();
     let (sender, receiver) = flume::unbounded();
 
     {
+      let refcount = refcount.clone();
       let sender = sender.clone();
       task::spawn(async move {
         let mut room_thread = RoomTask {
           rooms,
+          refcount,
           name,
           receiver,
           sender,
@@ -410,7 +412,10 @@ impl Room {
       });
     }
 
-    Self { channel: sender }
+    Self {
+      refcount,
+      channel: sender,
+    }
   }
 }
 
@@ -418,6 +423,7 @@ pub enum Message {
   CreateSession {
     peer_connection: Arc<RTCPeerConnection>,
     response: Sender<Result<message_response::CreateSession, HandlerError>>,
+    _ref: Ref,
   },
   GetSessionPeerConnection {
     session_id: SessionId,
@@ -430,6 +436,7 @@ pub enum Message {
   CreateStream {
     peer_connection: Arc<RTCPeerConnection>,
     response: Sender<Result<message_response::CreateStream, HandlerError>>,
+    _ref: Ref,
   },
   HandleStreamTrack {
     stream_id: StreamId,
@@ -551,6 +558,7 @@ impl Event {
 
 struct RoomTask {
   rooms: Arc<DashMap<String, Room>>,
+  refcount: Refcount,
   name: String,
   receiver: Receiver<Message>,
   sender: Sender<Message>,
@@ -574,6 +582,7 @@ impl RoomTask {
         Message::CreateSession {
           peer_connection,
           response,
+          ..
         } => self.create_session(peer_connection, response).await,
         Message::GetSessionPeerConnection {
           session_id,
@@ -586,6 +595,7 @@ impl RoomTask {
         Message::CreateStream {
           peer_connection,
           response,
+          ..
         } => self.create_stream(peer_connection, response).await,
         Message::HandleStreamTrack {
           stream_id,
@@ -870,6 +880,10 @@ impl RoomTask {
 
   async fn try_exit(&self) {
     if !self.sessions.is_empty() || !self.streams.is_empty() {
+      return;
+    }
+
+    if !self.refcount.try_release() {
       return;
     }
 

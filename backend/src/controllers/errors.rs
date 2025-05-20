@@ -75,8 +75,6 @@ pub enum HandlerError {
   SendMessage,
   #[error("Could not receive message from channel (all senders dropped): {0}.")]
   ReceiveMessage(#[from] flume::RecvError),
-  #[error("Room continuously exited before receiving message and max retry count was reached.")]
-  SendMessageMaxRetryReached,
 }
 
 impl HandlerError {
@@ -151,10 +149,7 @@ impl IntoResponse for HandlerError {
       | HandlerError::SetLocalDescription(_)
       | HandlerError::GetLocalDescription
       | HandlerError::SendMessage
-      | HandlerError::ReceiveMessage(_)
-      | HandlerError::SendMessageMaxRetryReached => {
-        self.as_generic(StatusCode::INTERNAL_SERVER_ERROR)
-      }
+      | HandlerError::ReceiveMessage(_) => self.as_generic(StatusCode::INTERNAL_SERVER_ERROR),
     }
     .into_response()
   }
