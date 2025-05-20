@@ -270,7 +270,7 @@ onMounted(async () => {
     </div>
     <div class="flex min-h-0 min-w-0 grow items-center justify-center pt-2 pb-5">
       <video v-show="streaming" ref="video" class="max-h-full max-w-full" autoplay />
-      <p v-show="!streaming" class="text-center text-xl">no active stream</p>
+      <p v-show="!streaming" class="text-center text-2xl">no active stream</p>
     </div>
     <div class="flex">
       <div class="mx-auto">
