@@ -1,11 +1,22 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useRoute } from "vue-router";
 import { useFetch } from "@/api";
 import { silenceApiError } from "@/errors";
 import { router } from "@/router";
 import { generateRoomName } from "@/strings";
 
-const name = ref(generateRoomName());
+const route = useRoute();
+
+function createRoomName(): string {
+  if (route.query.name) {
+    return route.query.name.toString();
+  }
+
+  return generateRoomName();
+}
+
+const name = ref(createRoomName());
 
 const { execute, pending, error } = await useFetch({
   method: "post",
