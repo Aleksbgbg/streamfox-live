@@ -69,6 +69,14 @@
             type = types.ints.u16;
             description = "Maximum UDP port to use for WebRTC connections (inclusive)";
           };
+
+          debug.webRtcLogLevel = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = ''
+              Emit webrtc-rs logs that are at the specified verbosity or lower [to journald]
+            '';
+          };
         };
 
         config = mkIf cfg.enable {
@@ -77,15 +85,23 @@
             wantedBy = ["multi-user.target"];
 
             serviceConfig = {
-              ExecStart = utils.escapeSystemdExecArgs [
-                "${self.packages.${pkgs.system}.default}/bin/backend"
-                "--public-ip"
-                cfg.publicIp
-                "--port-min"
-                cfg.portMin
-                "--port-max"
-                cfg.portMax
-              ];
+              ExecStart = utils.escapeSystemdExecArgs (
+                [
+                  "${self.packages.${pkgs.system}.default}/bin/backend"
+                  "--public-ip"
+                  cfg.publicIp
+                  "--port-min"
+                  cfg.portMin
+                  "--port-max"
+                  cfg.portMax
+                ]
+                ++ lists.flatten
+                (
+                  lists.optional
+                  (cfg.debug.webRtcLogLevel != null)
+                  ["--webrtc-log-level" cfg.debug.webRtcLogLevel]
+                )
+              );
               Restart = "always";
               Type = "exec";
             };

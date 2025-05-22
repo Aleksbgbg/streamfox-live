@@ -1,11 +1,15 @@
 mod controllers;
+mod debug;
 mod refcount;
 
 use crate::controllers::room;
 use crate::controllers::room::Room;
+use crate::debug::webrtc_logs;
+use crate::debug::webrtc_logs::InitWebRtcLogsError;
 use axum::{Router, routing};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use dashmap::DashMap;
+use log::LevelFilter;
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -18,6 +22,27 @@ use tracing::{Level, error, info};
 use webrtc::api::setting_engine::SettingEngine;
 use webrtc::ice::udp_network::{EphemeralUDP, UDPNetwork};
 use webrtc::ice_transport::ice_candidate_type::RTCIceCandidateType;
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum LogLevelFilter {
+  Error,
+  Warn,
+  Info,
+  Debug,
+  Trace,
+}
+
+impl From<LogLevelFilter> for LevelFilter {
+  fn from(value: LogLevelFilter) -> Self {
+    match value {
+      LogLevelFilter::Error => LevelFilter::Error,
+      LogLevelFilter::Warn => LevelFilter::Warn,
+      LogLevelFilter::Info => LevelFilter::Info,
+      LogLevelFilter::Debug => LevelFilter::Debug,
+      LogLevelFilter::Trace => LevelFilter::Trace,
+    }
+  }
+}
 
 /// WebRTC screen sharing server
 #[derive(Debug, Parser)]
@@ -34,10 +59,29 @@ struct Args {
   /// Maximum UDP port to use for WebRTC connections (inclusive)
   #[arg(long)]
   port_max: u16,
+
+  /// Emit webrtc-rs logs that are at the specified verbosity or lower
+  ///
+  /// Logs will be emitted:
+  ///
+  ///  - to stdout by default
+  ///
+  ///  - to journald when running as a systemd service
+  ///
+  ///  - to the specified file descriptor if `--webrtc-log-fd` is used
+  #[arg(long, value_enum)]
+  webrtc_log_level: Option<LogLevelFilter>,
+
+  /// Emit webrtc-rs logs to the specified file descriptor
+  #[cfg(unix)]
+  #[arg(long, requires = "webrtc_log_level")]
+  webrtc_log_fd: Option<std::os::fd::RawFd>,
 }
 
 #[derive(Debug, Error)]
 enum AppError {
+  #[error(transparent)]
+  InitLogsError(#[from] InitWebRtcLogsError),
   #[error("could not bind to network interface: {0}")]
   BindTcpListener(std::io::Error),
   #[error("could not create ephemeral UDP port range: {0}")]
@@ -76,6 +120,8 @@ fn create_webrtc_app_config(args: &Args) -> Result<WebRtcAppConfig, AppError> {
 
 #[tokio::main]
 async fn start(args: &Args) -> Result<(), AppError> {
+  webrtc_logs::init(args)?;
+
   let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], 8001)))
     .await
     .map_err(AppError::BindTcpListener)?;
