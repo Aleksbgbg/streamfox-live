@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type Ref, computed, onMounted, ref } from "vue";
+import { type Ref, computed, onMounted, onUnmounted, ref } from "vue";
 import { UserIcon } from "@heroicons/vue/24/solid";
 import { useFetch } from "@/api";
 import { assertNotNull, reportApiError } from "@/errors";
@@ -132,10 +132,12 @@ interface Stream {
   mediaStream: MediaStream;
 }
 
+let sessionConnection: RTCPeerConnection | null = null;
+
 onMounted(async () => {
   assertNotNull(video.value).addEventListener("canplay", () => (loading.value = false));
 
-  const connection = new RTCPeerConnection(config);
+  const connection = (sessionConnection = new RTCPeerConnection(config));
 
   let sessionId: string | null = null;
 
@@ -264,6 +266,14 @@ onMounted(async () => {
         break;
     }
   });
+});
+
+onUnmounted(() => {
+  if (sessionConnection === null) {
+    return;
+  }
+
+  sessionConnection.close();
 });
 </script>
 
