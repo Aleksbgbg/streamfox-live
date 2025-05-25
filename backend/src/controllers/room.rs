@@ -704,11 +704,12 @@ impl RoomTask {
   }
 
   async fn establish_session(&mut self, session_id: SessionId, data_channel: Arc<RTCDataChannel>) {
+    if !self.sessions.contains_key(&session_id) {
+      return;
+    }
+
     {
-      let session = self
-        .sessions
-        .get_mut(&session_id)
-        .expect("attempt to establish session which has been destroyed");
+      let session = self.sessions.get_mut(&session_id).unwrap();
       session.data_channel = Some(data_channel);
     }
 
@@ -796,10 +797,11 @@ impl RoomTask {
   }
 
   async fn handle_stream_track(&mut self, stream_id: StreamId, remote_track: Arc<TrackRemote>) {
-    let stream = self
-      .streams
-      .get_mut(&stream_id)
-      .expect("attempt to handle track for stream which has been destroyed");
+    if !self.streams.contains_key(&stream_id) {
+      return;
+    }
+
+    let stream = self.streams.get_mut(&stream_id).unwrap();
 
     let local_track = Arc::new(TrackLocalStaticRTP::new(
       remote_track.codec().capability,
@@ -837,11 +839,12 @@ impl RoomTask {
   }
 
   async fn establish_stream(&mut self, stream_id: StreamId) {
+    if !self.streams.contains_key(&stream_id) {
+      return;
+    }
+
     {
-      let stream = self
-        .streams
-        .get_mut(&stream_id)
-        .expect("attempt to establish stream which has been destroyed");
+      let stream = self.streams.get_mut(&stream_id).unwrap();
       stream.established = true;
     }
 
@@ -862,7 +865,9 @@ impl RoomTask {
     if let Some(stream) = self.streams.remove(&stream_id) {
       let _ = stream.peer_connection.close().await;
 
-      self.broadcast(&Event::new_stream_ended(stream_id)).await;
+      if stream.established {
+        self.broadcast(&Event::new_stream_ended(stream_id)).await;
+      }
 
       self.try_exit().await;
     }
@@ -872,7 +877,9 @@ impl RoomTask {
     if let Some(session) = self.sessions.remove(&session_id) {
       let _ = session.peer_connection.close().await;
 
-      self.multicast(session_id, &Event::new_user_left()).await;
+      if session.established() {
+        self.multicast(session_id, &Event::new_user_left()).await;
+      }
 
       self.try_exit().await;
     }
