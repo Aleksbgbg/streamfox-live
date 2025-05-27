@@ -45,6 +45,7 @@
       config,
       lib,
       pkgs,
+      utils,
       ...
     }:
       with lib; let
@@ -76,11 +77,15 @@
             wantedBy = ["multi-user.target"];
 
             serviceConfig = {
-              ExecStart =
-                "${self.packages.${pkgs.system}.default}/bin/backend " +
-                "--public-ip ${cfg.publicIp} " +
-                "--port-min ${toString cfg.portMin} " +
-                "--port-max ${toString cfg.portMax}";
+              ExecStart = utils.escapeSystemdExecArgs [
+                "${self.packages.${pkgs.system}.default}/bin/backend"
+                "--public-ip"
+                cfg.publicIp
+                "--port-min"
+                cfg.portMin
+                "--port-max"
+                cfg.portMax
+              ];
               Restart = "always";
               Type = "exec";
             };
