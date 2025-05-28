@@ -55,17 +55,17 @@
           enable = mkEnableOption description;
 
           publicIp = mkOption {
-            type = lib.types.str;
+            type = types.str;
             description = "Public IP address to use for the WebRTC ICE host candidate";
           };
 
           portMin = mkOption {
-            type = lib.types.ints.u16;
+            type = types.ints.u16;
             description = "Minimum UDP port to use for WebRTC connections (inclusive)";
           };
 
           portMax = mkOption {
-            type = lib.types.ints.u16;
+            type = types.ints.u16;
             description = "Maximum UDP port to use for WebRTC connections (inclusive)";
           };
         };
