@@ -898,8 +898,6 @@ impl RoomTask {
   }
 
   async fn add_stream(&self, session: &Session, stream: &Stream) {
-    let stream_id = stream.id;
-
     for track in &stream.tracks {
       if let Ok(rtp_sender) = session
         .peer_connection
@@ -925,7 +923,9 @@ impl RoomTask {
       } else {
         self
           .sender
-          .send_async(Message::DestroyStream { stream_id })
+          .send_async(Message::DestroyStream {
+            stream_id: stream.id,
+          })
           .await
           .unwrap();
       }
