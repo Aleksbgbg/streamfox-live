@@ -251,14 +251,24 @@ onMounted(async () => {
         {
           const streamId = message.streamEndedPayload.streamId;
 
-          if (currentStreamId === streamId) {
-            streaming.value = false;
-            currentStreamId = null;
-            assertNotNull(video.value).srcObject = null;
-          }
-
           const stream = assertNotNull(streams.get(streamId));
           streams.delete(streamId);
+
+          if (currentStreamId === streamId) {
+            const next = streams.entries().next();
+
+            if (next.value === undefined) {
+              streaming.value = false;
+              currentStreamId = null;
+              assertNotNull(video.value).srcObject = null;
+            } else {
+              const [streamId, stream] = next.value;
+
+              assertNotNull(video.value).srcObject = stream.mediaStream;
+              currentStreamId = streamId;
+              loading.value = true;
+            }
+          }
 
           stream.audioTransceiver.stop();
           stream.videoTransceiver.stop();
