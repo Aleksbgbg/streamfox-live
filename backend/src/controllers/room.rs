@@ -908,6 +908,7 @@ impl RoomTask {
       {
         let peer_connection = Arc::clone(&stream.peer_connection);
         let sender = self.sender.clone();
+        let session_id = session.id;
         task::spawn(async move {
           let mut buffer = [0u8; RTCP_BUFFER_SIZE_BYTES];
           while let Ok((packets, _)) = rtp_sender.read(&mut buffer).await {
@@ -918,7 +919,7 @@ impl RoomTask {
           }
 
           let _ = sender
-            .send_async(Message::DestroyStream { stream_id })
+            .send_async(Message::DestroySession { session_id })
             .await;
         });
       } else {
