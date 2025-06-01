@@ -505,11 +505,13 @@ enum EventType {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct StreamStartedPayload {
   stream_id: StreamId,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct StreamEndedPayload {
   stream_id: StreamId,
 }
