@@ -442,9 +442,6 @@ pub enum Message {
     stream_id: StreamId,
     remote_track: Arc<TrackRemote>,
   },
-  EstablishStream {
-    stream_id: StreamId,
-  },
   DestroyStream {
     stream_id: StreamId,
   },
@@ -603,7 +600,6 @@ impl RoomTask {
           stream_id,
           remote_track,
         } => self.handle_stream_track(stream_id, remote_track).await,
-        Message::EstablishStream { stream_id } => self.establish_stream(stream_id).await,
         Message::DestroyStream { stream_id } => self.destroy_stream(stream_id).await,
         Message::DestroySession { session_id } => self.destroy_session(session_id).await,
         Message::Exit => break,
@@ -831,20 +827,14 @@ impl RoomTask {
 
     stream.tracks.push(local_track);
 
-    if stream.tracks.len() == STREAM_TRACK_COUNT {
-      self
-        .sender
-        .send_async(Message::EstablishStream { stream_id })
-        .await
-        .unwrap();
-    }
-  }
-
-  async fn establish_stream(&mut self, stream_id: StreamId) {
-    if !self.streams.contains_key(&stream_id) {
+    if stream.tracks.len() != STREAM_TRACK_COUNT {
       return;
     }
 
+    self.establish_stream(stream_id).await;
+  }
+
+  async fn establish_stream(&mut self, stream_id: StreamId) {
     {
       let stream = self.streams.get_mut(&stream_id).unwrap();
       stream.established = true;
