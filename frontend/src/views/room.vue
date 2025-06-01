@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { type Ref, computed, onMounted, onUnmounted, ref } from "vue";
 import { UserIcon } from "@heroicons/vue/24/solid";
+import { sort } from "@/arrays";
 import { createSession, renegotiateSession, trickleIceCandidate } from "@/endpoints/room";
 import { assertNotNull } from "@/errors";
-import { type Event, EventType } from "@/rtc/event";
+import { computeSupportedVideoCodecs, videoCodecToString } from "@/rtc/codecs";
+import { type Event, EventType, type StreamFailedError, StreamFailedErrorCode } from "@/rtc/event";
+import { toHumanReadableList } from "@/strings";
 import { config, dataChannelMessageToString } from "@/webrtc";
 
 const props = defineProps<{
@@ -49,7 +52,21 @@ const users = computed(() => (channelState.value === Channel.Open ? peers.value 
 
 const loading = ref(false);
 const streaming = ref(false);
+const error: Ref<StreamFailedError | null> = ref(null);
 
+const streamCodec = computed(() => {
+  if (error.value === null) {
+    return null;
+  }
+
+  if (error.value.code !== StreamFailedErrorCode.UnsupportedVideoCodec) {
+    return null;
+  }
+
+  return videoCodecToString(assertNotNull(error.value.unsupportedVideoCodecParams).source);
+});
+const supportedVideoCodecs = sort(computeSupportedVideoCodecs());
+const configurationSupportedCodecs = toHumanReadableList(supportedVideoCodecs, videoCodecToString);
 const video: Ref<HTMLVideoElement | null> = ref(null);
 
 function closeChannel() {
@@ -57,10 +74,16 @@ function closeChannel() {
   channelState.value = Channel.Closed;
 }
 
-interface Stream {
+interface ActiveStream {
   videoTransceiver: RTCRtpTransceiver;
   audioTransceiver: RTCRtpTransceiver;
   mediaStream: MediaStream;
+}
+
+interface Stream {
+  isActive: boolean;
+  active: ActiveStream | null;
+  error: StreamFailedError | null;
 }
 
 let sessionConnection: RTCPeerConnection | null = null;
@@ -77,7 +100,11 @@ onMounted(async () => {
 
     let answerSdp;
     if (sessionId === null) {
-      const answer = await createSession(props.name, assertNotNull(offer.sdp));
+      const answer = await createSession(
+        props.name,
+        assertNotNull(offer.sdp),
+        supportedVideoCodecs,
+      );
 
       if (answer === null) {
         return;
@@ -156,14 +183,38 @@ onMounted(async () => {
           mediaStream.addTrack(audioTransceiver.receiver.track);
 
           streams.set(streamId, {
-            audioTransceiver,
-            videoTransceiver,
-            mediaStream,
+            isActive: true,
+            active: {
+              audioTransceiver,
+              videoTransceiver,
+              mediaStream,
+            },
+            error: null,
           });
 
           assertNotNull(video.value).srcObject = mediaStream;
           currentStreamId = streamId;
+
+          error.value = null;
           loading.value = true;
+          streaming.value = true;
+        }
+        break;
+      case EventType.StreamFailed:
+        {
+          const streamId = message.streamFailedPayload.streamId;
+          const err = message.streamFailedPayload.error;
+
+          streams.set(streamId, {
+            isActive: false,
+            active: null,
+            error: err,
+          });
+
+          currentStreamId = streamId;
+
+          error.value = err;
+          loading.value = false;
           streaming.value = true;
         }
         break;
@@ -171,7 +222,7 @@ onMounted(async () => {
         {
           const streamId = message.streamEndedPayload.streamId;
 
-          const stream = assertNotNull(streams.get(streamId));
+          const currentStream = assertNotNull(streams.get(streamId));
           streams.delete(streamId);
 
           if (currentStreamId === streamId) {
@@ -179,19 +230,34 @@ onMounted(async () => {
 
             if (next.value === undefined) {
               streaming.value = false;
+              error.value = null;
+
               currentStreamId = null;
               assertNotNull(video.value).srcObject = null;
             } else {
-              const [streamId, stream] = next.value;
+              const [streamId, nextStream] = next.value;
 
-              assertNotNull(video.value).srcObject = stream.mediaStream;
-              currentStreamId = streamId;
-              loading.value = true;
+              if (nextStream.isActive) {
+                assertNotNull(video.value).srcObject = assertNotNull(nextStream.active).mediaStream;
+                currentStreamId = streamId;
+
+                error.value = null;
+                loading.value = true;
+              } else {
+                assertNotNull(video.value).srcObject = null;
+                currentStreamId = streamId;
+
+                error.value = nextStream.error;
+                loading.value = false;
+              }
             }
           }
 
-          stream.audioTransceiver.stop();
-          stream.videoTransceiver.stop();
+          if (currentStream.isActive) {
+            const active = assertNotNull(currentStream.active);
+            active.audioTransceiver.stop();
+            active.videoTransceiver.stop();
+          }
         }
         break;
     }
@@ -215,7 +281,28 @@ onUnmounted(() => {
     <div class="flex min-h-0 min-w-0 grow items-center justify-center pt-2 pb-5">
       <div v-show="streaming" class="contents">
         <span v-show="loading" class="loading loading-infinity text-primary h-16 w-16"></span>
-        <video v-show="!loading" ref="video" class="max-h-full max-w-full" autoplay />
+        <div
+          v-if="!loading && error"
+          role="alert"
+          class="alert alert-error alert-soft mx-5 text-lg">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-6 w-6 shrink-0 stroke-current"
+            fill="none"
+            viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span v-if="error.code === StreamFailedErrorCode.UnsupportedVideoCodec"
+            >Your device hardware or browser software do not support the video codec which the user
+            has chosen for their video stream ({{ streamCodec }}). Your configuration only supports
+            {{ configurationSupportedCodecs }}.</span
+          >
+        </div>
+        <video v-show="!loading && !error" ref="video" class="max-h-full max-w-full" autoplay />
       </div>
       <p v-show="!streaming" class="text-center text-2xl">no active stream</p>
     </div>

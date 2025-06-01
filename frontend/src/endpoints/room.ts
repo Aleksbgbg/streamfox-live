@@ -1,5 +1,6 @@
 import { useFetch } from "@/api";
 import { assertNotNull, reportApiError } from "@/errors";
+import { VideoCodec } from "@/rtc/codecs";
 
 interface CreateSessionResponse {
   sessionId: string;
@@ -9,12 +10,14 @@ interface CreateSessionResponse {
 export async function createSession(
   roomName: string,
   sdp: string,
+  supportedVideoCodecs: VideoCodec[],
 ): Promise<CreateSessionResponse | null> {
   const { data, error } = await useFetch<CreateSessionResponse>({
     method: "post",
     url: `/room/${roomName}/session`,
     data: {
       sdp,
+      supportedVideoCodecs,
     },
     immediate: true,
   });

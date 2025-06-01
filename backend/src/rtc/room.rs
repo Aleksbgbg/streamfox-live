@@ -1,6 +1,7 @@
 use crate::controllers::errors::HandlerError;
 use crate::refcount::Refcount;
-use crate::rtc::event::Event;
+use crate::rtc::codecs::{self, Codec, VideoCodec};
+use crate::rtc::event::{Event, StreamFailedError};
 use crate::rtc::message::{Message, response};
 use crate::rtc::session::{Session, SessionId};
 use crate::rtc::stream::{Stream, StreamId};
@@ -88,10 +89,15 @@ impl RoomTask {
         .expect(THIRD_PARTY_REMOVAL_ERR)
       {
         Message::CreateSession {
+          supported_video_codecs,
           peer_connection,
           response,
           ..
-        } => self.create_session(peer_connection, response).await,
+        } => {
+          self
+            .create_session(supported_video_codecs, peer_connection, response)
+            .await
+        }
         Message::GetSessionPeerConnection {
           session_id,
           response,
@@ -123,6 +129,7 @@ impl RoomTask {
 
   async fn create_session(
     &mut self,
+    supported_video_codecs: Vec<VideoCodec>,
     peer_connection: Arc<RTCPeerConnection>,
     response: Sender<Result<response::CreateSession, HandlerError>>,
   ) {
@@ -183,6 +190,7 @@ impl RoomTask {
         session_id,
         Session {
           id: session_id,
+          supported_video_codecs,
           peer_connection,
           data_channel: None,
         },
@@ -230,15 +238,12 @@ impl RoomTask {
 
       self.unicast(session, &Event::new_user_joined()).await;
     }
-    for (&stream_id, stream) in &self.streams {
+    for stream in self.streams.values() {
       if !stream.established {
         continue;
       }
 
-      self
-        .unicast(session, &Event::new_stream_started(stream_id))
-        .await;
-      self.add_stream(session, stream).await;
+      self.try_add_stream(session, stream).await;
     }
   }
 
@@ -291,6 +296,7 @@ impl RoomTask {
         stream_id,
         Stream {
           id: stream_id,
+          video_codec: None,
           established: false,
           peer_connection,
           tracks: Vec::with_capacity(STREAM_TRACK_COUNT),
@@ -308,10 +314,26 @@ impl RoomTask {
       return;
     }
 
+    let capability = remote_track.codec().capability;
     let stream = self.streams.get_mut(&stream_id).unwrap();
 
+    match codecs::mime_type_to_codec(&capability.mime_type) {
+      Ok(codec) => match codec {
+        Codec::SupportedVideo(video_codec) => stream.video_codec = Some(video_codec),
+        Codec::UnsupportedVideo => {
+          self.destroy_stream(stream_id).await;
+          return;
+        }
+        Codec::Audio => {}
+      },
+      Err(_) => {
+        self.destroy_stream(stream_id).await;
+        return;
+      }
+    }
+
     let local_track = Arc::new(TrackLocalStaticRTP::new(
-      remote_track.codec().capability,
+      capability,
       remote_track.id(),
       remote_track.stream_id(),
     ));
@@ -351,14 +373,12 @@ impl RoomTask {
 
     let stream = self.streams.get(&stream_id).unwrap();
 
-    self.broadcast(&Event::new_stream_started(stream_id)).await;
-
     for session in self.sessions.values() {
       if !session.established() {
         continue;
       }
 
-      self.add_stream(session, stream).await;
+      self.try_add_stream(session, stream).await;
     }
   }
 
@@ -396,6 +416,28 @@ impl RoomTask {
     }
 
     self.sender.send_async(Message::Exit).await.unwrap();
+  }
+
+  async fn try_add_stream(&self, session: &Session, stream: &Stream) {
+    if session
+      .supported_video_codecs
+      .contains(&stream.video_codec.unwrap())
+    {
+      self
+        .unicast(session, &Event::new_stream_started(stream.id))
+        .await;
+      self.add_stream(session, stream).await;
+    } else {
+      self
+        .unicast(
+          session,
+          &Event::new_stream_failed(
+            stream.id,
+            StreamFailedError::new_unsupported_video_codec(stream.video_codec.unwrap()),
+          ),
+        )
+        .await;
+    }
   }
 
   async fn add_stream(&self, session: &Session, stream: &Stream) {

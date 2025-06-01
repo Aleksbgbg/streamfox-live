@@ -1,5 +1,28 @@
 import { randomInt } from "@/numbers";
 
+export function toHumanReadableList<T>(list: T[], toString: (value: T) => string): string {
+  switch (list.length) {
+    case 0:
+      return "";
+    case 1:
+      return toString(list[0]);
+    case 2:
+      return `${toString(list[0])} and ${toString(list[1])}`;
+    default:
+      let string = "";
+      for (const [index, item] of list.entries()) {
+        const itemString = toString(item);
+
+        if (index < list.length - 1) {
+          string += `${itemString}, `;
+        } else {
+          string += `and ${itemString}`;
+        }
+      }
+      return string;
+  }
+}
+
 export function generateRoomName(): string {
   return [pickRandom(POSITIVE_ADJECTIVES), pickRandom(COLOURS), pickRandom(ANIMALS)].join("-");
 }

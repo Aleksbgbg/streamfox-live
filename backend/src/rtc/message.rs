@@ -1,5 +1,6 @@
 use crate::controllers::errors::HandlerError;
 use crate::refcount::Ref;
+use crate::rtc::codecs::VideoCodec;
 use crate::rtc::session::SessionId;
 use crate::rtc::stream::StreamId;
 use flume::Sender;
@@ -10,6 +11,7 @@ use webrtc::track::track_remote::TrackRemote;
 
 pub enum Message {
   CreateSession {
+    supported_video_codecs: Vec<VideoCodec>,
     peer_connection: Arc<RTCPeerConnection>,
     response: Sender<Result<response::CreateSession, HandlerError>>,
     _ref: Ref,

@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::controllers::errors::{HandlerError, ValidatedJson};
+use crate::rtc::codecs::VideoCodec;
 use crate::rtc::message::Message;
 use crate::rtc::room::Room;
 use crate::rtc::session::SessionId;
@@ -44,6 +45,7 @@ pub async fn validate_name(
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionRequest {
   sdp: String,
+  supported_video_codecs: Vec<VideoCodec>,
 }
 
 #[derive(Serialize)]
@@ -117,6 +119,7 @@ pub async fn create_session(
       room
         .channel
         .send_async(Message::CreateSession {
+          supported_video_codecs: request.supported_video_codecs.clone(),
           peer_connection: Arc::clone(&peer_connection),
           response: sender.clone(),
           _ref: r#ref,
