@@ -382,7 +382,7 @@ pub async fn destroy_stream(
 
 pub struct Room {
   refcount: Refcount,
-  pub channel: Sender<Message>,
+  channel: Sender<Message>,
 }
 
 impl Room {
@@ -419,7 +419,7 @@ impl Room {
   }
 }
 
-pub enum Message {
+enum Message {
   CreateSession {
     peer_connection: Arc<RTCPeerConnection>,
     response: Sender<Result<message_response::CreateSession, HandlerError>>,
