@@ -522,35 +522,33 @@ struct Event {
 }
 
 impl Event {
-  fn new_user_joined() -> Self {
-    Event {
-      r#type: EventType::UserJoined,
-      stream_started_payload: None,
-      stream_ended_payload: None,
+  fn default(r#type: EventType) -> Self {
+    Self {
+      r#type,
+      stream_started_payload: Default::default(),
+      stream_ended_payload: Default::default(),
     }
+  }
+
+  fn new_user_joined() -> Self {
+    Self::default(EventType::UserJoined)
   }
 
   fn new_user_left() -> Self {
-    Event {
-      r#type: EventType::UserLeft,
-      stream_started_payload: None,
-      stream_ended_payload: None,
-    }
+    Self::default(EventType::UserLeft)
   }
 
   fn new_stream_started(stream_id: StreamId) -> Self {
-    Event {
-      r#type: EventType::StreamStarted,
+    Self {
       stream_started_payload: Some(StreamStartedPayload { stream_id }),
-      stream_ended_payload: None,
+      ..Self::default(EventType::StreamStarted)
     }
   }
 
   fn new_stream_ended(stream_id: StreamId) -> Self {
-    Event {
-      r#type: EventType::StreamEnded,
-      stream_started_payload: None,
+    Self {
       stream_ended_payload: Some(StreamEndedPayload { stream_id }),
+      ..Self::default(EventType::StreamEnded)
     }
   }
 }
