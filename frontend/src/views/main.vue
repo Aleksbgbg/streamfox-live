@@ -39,7 +39,7 @@ async function enter() {
 
 <template>
   <div class="card bg-base-300 card-md mx-auto mt-10 w-96 shadow-sm">
-    <div class="card-body">
+    <form class="card-body" @submit.prevent="enter">
       <h1 class="card-title">Hello, guest!</h1>
       <p>Join or create a room.</p>
       <input
@@ -52,11 +52,11 @@ async function enter() {
         <p class="text-error text-sm" v-for="err of error.specific.name" :key="err">{{ err }}</p>
       </div>
       <div class="card-actions">
-        <button class="btn btn-primary w-full capitalize" :disabled="pending" @click="enter">
+        <button class="btn btn-primary w-full capitalize" :disabled="pending" type="submit">
           enter room
           <span v-show="pending" class="loading loading-spinner loading-xs" />
         </button>
       </div>
-    </div>
+    </form>
   </div>
 </template>
