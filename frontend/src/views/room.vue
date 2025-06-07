@@ -192,7 +192,7 @@ onMounted(async () => {
       return;
     }
 
-    const { error } = await useFetch<{ sdp: string }>({
+    const { error } = await useFetch<void>({
       method: "patch",
       url: `/room/${props.name}/session/${sessionId}`,
       data: {
