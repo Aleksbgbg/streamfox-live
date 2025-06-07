@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { type Ref, computed, onMounted, onUnmounted, ref } from "vue";
 import { UserIcon } from "@heroicons/vue/24/solid";
-import { useFetch } from "@/api";
-import { assertNotNull, reportApiError } from "@/errors";
+import { createSession, renegotiateSession, trickleIceCandidate } from "@/endpoints/room";
+import { assertNotNull } from "@/errors";
+import { type Event, EventType } from "@/rtc/event";
 import { config, dataChannelMessageToString } from "@/webrtc";
 
 const props = defineProps<{
@@ -54,76 +55,6 @@ const video: Ref<HTMLVideoElement | null> = ref(null);
 function closeChannel() {
   peers.value = 0;
   channelState.value = Channel.Closed;
-}
-
-enum EventType {
-  UserJoined,
-  UserLeft,
-  StreamStarted,
-  StreamEnded,
-}
-
-interface StreamStartedPayload {
-  streamId: string;
-}
-
-interface StreamEndedPayload {
-  streamId: string;
-}
-
-interface Event {
-  type: EventType;
-  streamStartedPayload: StreamStartedPayload;
-  streamEndedPayload: StreamEndedPayload;
-}
-
-interface CreateSessionResponse {
-  sessionId: string;
-  sdp: string;
-}
-
-async function createSession(roomName: string, sdp: string): Promise<CreateSessionResponse | null> {
-  const { data, error } = await useFetch<CreateSessionResponse>({
-    method: "post",
-    url: `/room/${roomName}/session`,
-    data: {
-      sdp,
-    },
-    immediate: true,
-  });
-
-  if (error.value) {
-    reportApiError(error.value);
-    return null;
-  }
-
-  return assertNotNull(data.value);
-}
-
-interface RenegotiateSessionResponse {
-  sdp: string;
-}
-
-async function renegotiateSession(
-  roomName: string,
-  sessionId: string,
-  sdp: string,
-): Promise<RenegotiateSessionResponse | null> {
-  const { data, error } = await useFetch<RenegotiateSessionResponse>({
-    method: "post",
-    url: `/room/${roomName}/session/${sessionId}`,
-    data: {
-      sdp,
-    },
-    immediate: true,
-  });
-
-  if (error.value) {
-    reportApiError(error.value);
-    return null;
-  }
-
-  return assertNotNull(data.value);
 }
 
 interface Stream {
@@ -192,18 +123,7 @@ onMounted(async () => {
       return;
     }
 
-    const { error } = await useFetch<void>({
-      method: "patch",
-      url: `/room/${props.name}/session/${sessionId}`,
-      data: {
-        candidate: event.candidate.toJSON(),
-      },
-      immediate: true,
-    });
-
-    if (error.value) {
-      reportApiError(error.value);
-    }
+    await trickleIceCandidate(props.name, assertNotNull(sessionId), event.candidate.toJSON());
   });
 
   const streams = new Map<string, Stream>();
