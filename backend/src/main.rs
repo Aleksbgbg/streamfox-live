@@ -1,11 +1,12 @@
 mod controllers;
 mod debug;
 mod refcount;
+mod rtc;
 
 use crate::controllers::room;
-use crate::controllers::room::Room;
 use crate::debug::webrtc_logs;
 use crate::debug::webrtc_logs::InitWebRtcLogsError;
+use crate::rtc::room::Room;
 use axum::{Router, routing};
 use clap::{Parser, ValueEnum};
 use dashmap::DashMap;
