@@ -4,7 +4,7 @@ mod debug;
 mod refcount;
 mod rtc;
 
-use crate::args::Args;
+use crate::args::{Args, WebRtcPortMapping};
 use crate::controllers::room;
 use crate::debug::webrtc_logs;
 use crate::debug::webrtc_logs::InitWebRtcLogsError;
@@ -16,14 +16,17 @@ use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use thiserror::Error;
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, UdpSocket};
 use tokio::{select, signal};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::{Level, error, info};
 use webrtc::api::setting_engine::SettingEngine;
+use webrtc::ice::udp_mux::{UDPMuxDefault, UDPMuxParams};
 use webrtc::ice::udp_network::{EphemeralUDP, UDPNetwork};
 use webrtc::ice_transport::ice_candidate_type::RTCIceCandidateType;
+
+const IP_V4_UNSPECIFIED_ADDRESS: [u8; 4] = [0, 0, 0, 0];
 
 #[derive(Debug, Error)]
 enum AppError {
@@ -31,6 +34,8 @@ enum AppError {
   InitLogsError(#[from] InitWebRtcLogsError),
   #[error("could not bind to network interface: {0}")]
   BindTcpListener(std::io::Error),
+  #[error("Could not bind UDP socket: {0}.")]
+  BindUdpSocket(std::io::Error),
   #[error("could not create ephemeral UDP port range: {0}")]
   CreateEphemeralUdpPortRange(webrtc::ice::Error),
   #[error("could not get path to current executable: {0}")]
@@ -54,13 +59,20 @@ struct AppState {
   rooms: Arc<DashMap<String, Room>>,
 }
 
-fn create_webrtc_app_config(args: &Args) -> Result<WebRtcAppConfig, AppError> {
+async fn create_webrtc_app_config(args: &Args) -> Result<WebRtcAppConfig, AppError> {
   let mut settings = SettingEngine::default();
   settings.set_nat_1to1_ips(vec![args.public_ip.clone()], RTCIceCandidateType::Host);
-  settings.set_udp_network(UDPNetwork::Ephemeral(
-    EphemeralUDP::new(args.webrtc_port_min, args.webrtc_port_max)
-      .map_err(AppError::CreateEphemeralUdpPortRange)?,
-  ));
+  settings.set_udp_network(match args.webrtc_ports() {
+    WebRtcPortMapping::SinglePort { port_mux } => {
+      let udp_socket = UdpSocket::bind(SocketAddr::from((IP_V4_UNSPECIFIED_ADDRESS, port_mux)))
+        .await
+        .map_err(AppError::BindUdpSocket)?;
+      UDPNetwork::Muxed(UDPMuxDefault::new(UDPMuxParams::new(udp_socket)))
+    }
+    WebRtcPortMapping::PortRange { port_min, port_max } => UDPNetwork::Ephemeral(
+      EphemeralUDP::new(port_min, port_max).map_err(AppError::CreateEphemeralUdpPortRange)?,
+    ),
+  });
 
   Ok(WebRtcAppConfig { settings })
 }
@@ -69,7 +81,7 @@ fn create_webrtc_app_config(args: &Args) -> Result<WebRtcAppConfig, AppError> {
 async fn start(args: &Args) -> Result<(), AppError> {
   webrtc_logs::init(args)?;
 
-  let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], 8001)))
+  let listener = TcpListener::bind(SocketAddr::from((IP_V4_UNSPECIFIED_ADDRESS, 8001)))
     .await
     .map_err(AppError::BindTcpListener)?;
 
@@ -90,7 +102,7 @@ async fn start(args: &Args) -> Result<(), AppError> {
       routing::delete(room::destroy_stream),
     )
     .with_state(Arc::new(AppState {
-      webrtc: create_webrtc_app_config(args)?,
+      webrtc: create_webrtc_app_config(args).await?,
       rooms: Arc::new(DashMap::default()),
     }));
   let app = Router::new()
@@ -116,8 +128,12 @@ async fn start(args: &Args) -> Result<(), AppError> {
       .map_err(AppError::GetListenerAddress)?
   );
   info!(
-    "[UDP] WebRTC listening on {}:[{}, {}]",
-    args.public_ip, args.webrtc_port_min, args.webrtc_port_max,
+    "[UDP] WebRTC listening on {}:{}",
+    args.public_ip,
+    match args.webrtc_ports() {
+      WebRtcPortMapping::SinglePort { port_mux } => port_mux.to_string(),
+      WebRtcPortMapping::PortRange { port_min, port_max } => format!("[{port_min}, {port_max}]"),
+    }
   );
 
   axum::serve(listener, app)

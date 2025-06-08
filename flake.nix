@@ -60,13 +60,21 @@
             description = "Public IP address to use for the WebRTC ICE host candidate";
           };
 
+          webRtcPortMux = mkOption {
+            type = types.nullOr types.ints.u16;
+            default = null;
+            description = "Multiplex all WebRTC connections on the specified UDP port";
+          };
+
           webRtcPortMin = mkOption {
-            type = types.ints.u16;
+            type = types.nullOr types.ints.u16;
+            default = null;
             description = "Minimum UDP port to use for WebRTC connections (inclusive)";
           };
 
           webRtcPortMax = mkOption {
-            type = types.ints.u16;
+            type = types.nullOr types.ints.u16;
+            default = null;
             description = "Maximum UDP port to use for WebRTC connections (inclusive)";
           };
 
@@ -90,11 +98,19 @@
                   "${self.packages.${pkgs.system}.default}/bin/backend"
                   "--public-ip"
                   cfg.publicIp
-                  "--webrtc-port-min"
-                  cfg.webRtcPortMin
-                  "--webrtc-port-max"
-                  cfg.webRtcPortMax
                 ]
+                ++ lists.flatten
+                (
+                  lists.optional
+                  (cfg.webRtcPortMux != null)
+                  ["--webrtc-port-mux" cfg.webRtcPortMux]
+                )
+                ++ lists.flatten
+                (
+                  lists.optional
+                  ((cfg.webRtcPortMin != null) && (cfg.webRtcPortMax != null))
+                  ["--webrtc-port-min" cfg.webRtcPortMin "--webrtc-port-max" cfg.webRtcPortMax]
+                )
                 ++ lists.flatten
                 (
                   lists.optional
