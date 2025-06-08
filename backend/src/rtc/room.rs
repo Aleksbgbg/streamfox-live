@@ -18,6 +18,8 @@ use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
 use webrtc::track::track_local::{TrackLocal, TrackLocalWriter};
 use webrtc::track::track_remote::TrackRemote;
 
+const MSID_MAX_LEN: usize = 64;
+
 const THIRD_PARTY_REMOVAL_ERR: &str =
   "another execution context removed this room from the global map";
 
@@ -334,8 +336,8 @@ impl RoomTask {
 
     let local_track = Arc::new(TrackLocalStaticRTP::new(
       capability,
-      remote_track.id(),
-      remote_track.stream_id(),
+      ensure_unique_id(remote_track.id(), stream_id),
+      ensure_unique_id(remote_track.stream_id(), stream_id),
     ));
 
     {
@@ -517,4 +519,10 @@ impl RoomTask {
 
 fn serialize(event: &Event) -> Bytes {
   Bytes::from(serde_json::to_string(&event).expect("could not convert event to string"))
+}
+
+fn ensure_unique_id(id: String, stream_id: StreamId) -> String {
+  let mut unique_id = format!("{stream_id}+{id}");
+  unique_id.truncate(MSID_MAX_LEN);
+  unique_id
 }
