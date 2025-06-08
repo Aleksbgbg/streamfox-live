@@ -2,21 +2,31 @@
 import { ref } from "vue";
 import { useRoute } from "vue-router";
 import { useFetch } from "@/api";
-import { silenceApiError } from "@/errors";
+import { assertNotNull, silenceApiError } from "@/errors";
 import { router } from "@/router";
+import { clearRoomName, retrieveRoomName, storeRoomName } from "@/store";
 import { generateRoomName } from "@/strings";
 
 const route = useRoute();
+const joiningRoom = !!route.query.name;
+
+const lastName = retrieveRoomName();
+const hasLastName = lastName !== null;
 
 function createRoomName(): string {
-  if (route.query.name) {
-    return route.query.name.toString();
+  if (joiningRoom) {
+    return assertNotNull(route.query.name).toString();
+  }
+
+  if (hasLastName) {
+    return lastName;
   }
 
   return generateRoomName();
 }
 
 const name = ref(createRoomName());
+const remember = ref(hasLastName);
 
 const { execute, pending, error } = await useFetch({
   method: "post",
@@ -26,6 +36,12 @@ const { execute, pending, error } = await useFetch({
 });
 
 async function enter() {
+  if (remember.value) {
+    storeRoomName(name.value);
+  } else {
+    clearRoomName();
+  }
+
   await execute();
 
   if (error.value) {
@@ -51,6 +67,10 @@ async function enter() {
       <div v-if="error" class="ml-1">
         <p class="text-error text-sm" v-for="err of error.specific.name" :key="err">{{ err }}</p>
       </div>
+      <label v-if="!joiningRoom" class="label text-neutral">
+        <input type="checkbox" class="toggle" v-model="remember" />
+        Remember room name
+      </label>
       <div class="card-actions">
         <button class="btn btn-primary w-full capitalize" :disabled="pending" type="submit">
           enter room
