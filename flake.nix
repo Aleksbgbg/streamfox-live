@@ -60,12 +60,12 @@
             description = "Public IP address to use for the WebRTC ICE host candidate";
           };
 
-          portMin = mkOption {
+          webRtcPortMin = mkOption {
             type = types.ints.u16;
             description = "Minimum UDP port to use for WebRTC connections (inclusive)";
           };
 
-          portMax = mkOption {
+          webRtcPortMax = mkOption {
             type = types.ints.u16;
             description = "Maximum UDP port to use for WebRTC connections (inclusive)";
           };
@@ -90,10 +90,10 @@
                   "${self.packages.${pkgs.system}.default}/bin/backend"
                   "--public-ip"
                   cfg.publicIp
-                  "--port-min"
-                  cfg.portMin
-                  "--port-max"
-                  cfg.portMax
+                  "--webrtc-port-min"
+                  cfg.webRtcPortMin
+                  "--webrtc-port-max"
+                  cfg.webRtcPortMax
                 ]
                 ++ lists.flatten
                 (

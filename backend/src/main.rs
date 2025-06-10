@@ -58,7 +58,7 @@ fn create_webrtc_app_config(args: &Args) -> Result<WebRtcAppConfig, AppError> {
   let mut settings = SettingEngine::default();
   settings.set_nat_1to1_ips(vec![args.public_ip.clone()], RTCIceCandidateType::Host);
   settings.set_udp_network(UDPNetwork::Ephemeral(
-    EphemeralUDP::new(args.port_min, args.port_max)
+    EphemeralUDP::new(args.webrtc_port_min, args.webrtc_port_max)
       .map_err(AppError::CreateEphemeralUdpPortRange)?,
   ));
 
@@ -117,7 +117,7 @@ async fn start(args: &Args) -> Result<(), AppError> {
   );
   info!(
     "[UDP] WebRTC listening on {}:[{}, {}]",
-    args.public_ip, args.port_min, args.port_max,
+    args.public_ip, args.webrtc_port_min, args.webrtc_port_max,
   );
 
   axum::serve(listener, app)

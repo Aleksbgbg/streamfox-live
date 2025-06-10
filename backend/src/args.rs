@@ -32,11 +32,11 @@ pub struct Args {
 
   /// Minimum UDP port to use for WebRTC connections (inclusive)
   #[arg(long)]
-  pub port_min: u16,
+  pub webrtc_port_min: u16,
 
   /// Maximum UDP port to use for WebRTC connections (inclusive)
   #[arg(long)]
-  pub port_max: u16,
+  pub webrtc_port_max: u16,
 
   /// Emit webrtc-rs logs that are at the specified verbosity or lower
   ///
