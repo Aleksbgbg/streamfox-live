@@ -81,9 +81,12 @@ async fn create_webrtc_app_config(args: &Args) -> Result<WebRtcAppConfig, AppErr
 async fn start(args: &Args) -> Result<(), AppError> {
   webrtc_logs::init(args)?;
 
-  let listener = TcpListener::bind(SocketAddr::from((IP_V4_UNSPECIFIED_ADDRESS, 8001)))
-    .await
-    .map_err(AppError::BindTcpListener)?;
+  let listener = TcpListener::bind(SocketAddr::from((
+    IP_V4_UNSPECIFIED_ADDRESS,
+    args.http_port,
+  )))
+  .await
+  .map_err(AppError::BindTcpListener)?;
 
   let api = Router::new()
     .route("/room/validate-name", routing::post(room::validate_name))

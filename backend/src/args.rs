@@ -37,6 +37,10 @@ pub struct Args {
   #[arg(long)]
   pub public_ip: String,
 
+  /// Accept HTTP requests on the specified TCP port
+  #[arg(long)]
+  pub http_port: u16,
+
   /// Multiplex all WebRTC connections on the specified UDP port
   #[arg(long, required_unless_present = "webrtc_port_min")]
   webrtc_port_mux: Option<u16>,

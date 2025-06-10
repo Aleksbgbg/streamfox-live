@@ -60,6 +60,11 @@
             description = "Public IP address to use for the WebRTC ICE host candidate";
           };
 
+          httpPort = mkOption {
+            type = types.ints.u16;
+            description = "Accept HTTP requests on the specified TCP port";
+          };
+
           webRtcPortMux = mkOption {
             type = types.nullOr types.ints.u16;
             default = null;
@@ -98,6 +103,8 @@
                   "${self.packages.${pkgs.system}.default}/bin/backend"
                   "--public-ip"
                   cfg.publicIp
+                  "--http-port"
+                  cfg.httpPort
                 ]
                 ++ lists.flatten
                 (
