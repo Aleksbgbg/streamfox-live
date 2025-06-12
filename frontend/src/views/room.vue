@@ -52,6 +52,19 @@ const users = computed(() => (channelState.value === Channel.Open ? peers.value 
 
 const streams = new Map<string, Stream>();
 const currentStreamId: Ref<string | null> = ref(null);
+const currentStream = computed(() => {
+  if (currentStreamId.value === null) {
+    return null;
+  }
+
+  const stream = assertNotNull(streams.get(currentStreamId.value));
+
+  if (!stream.isActive) {
+    return null;
+  }
+
+  return assertNotNull(stream.active).mediaStream;
+});
 
 const loading = ref(false);
 const streaming = computed(() => currentStreamId.value !== null);
@@ -82,7 +95,6 @@ const streamCodec = computed(() => {
 });
 const supportedVideoCodecs = sort(computeSupportedVideoCodecs());
 const configurationSupportedCodecs = toHumanReadableList(supportedVideoCodecs, videoCodecToString);
-const video: Ref<HTMLVideoElement | null> = ref(null);
 
 function closeChannel() {
   peers.value = 0;
@@ -206,7 +218,6 @@ onMounted(async () => {
             error: null,
           });
 
-          assertNotNull(video.value).srcObject = mediaStream;
           currentStreamId.value = streamId;
 
           loading.value = true;
@@ -240,17 +251,14 @@ onMounted(async () => {
 
             if (next.value === undefined) {
               currentStreamId.value = null;
-              assertNotNull(video.value).srcObject = null;
             } else {
               const [streamId, nextStream] = next.value;
 
               if (nextStream.isActive) {
-                assertNotNull(video.value).srcObject = assertNotNull(nextStream.active).mediaStream;
                 currentStreamId.value = streamId;
 
                 loading.value = true;
               } else {
-                assertNotNull(video.value).srcObject = null;
                 currentStreamId.value = streamId;
 
                 loading.value = false;
@@ -309,9 +317,9 @@ onUnmounted(() => {
         </div>
         <video
           v-show="!loading && !error"
-          ref="video"
           class="h-full w-full"
           autoplay
+          :srcObject="currentStream"
           @canplay="videoLoaded" />
       </div>
       <p v-show="!streaming" class="text-center text-2xl">no active stream</p>
