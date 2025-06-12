@@ -219,7 +219,6 @@ onMounted(async () => {
           });
 
           currentStreamId.value = streamId;
-
           loading.value = true;
         }
         break;
@@ -235,7 +234,6 @@ onMounted(async () => {
           });
 
           currentStreamId.value = streamId;
-
           loading.value = false;
         }
         break;
@@ -254,15 +252,8 @@ onMounted(async () => {
             } else {
               const [streamId, nextStream] = next.value;
 
-              if (nextStream.isActive) {
-                currentStreamId.value = streamId;
-
-                loading.value = true;
-              } else {
-                currentStreamId.value = streamId;
-
-                loading.value = false;
-              }
+              currentStreamId.value = streamId;
+              loading.value = nextStream.isActive;
             }
           }
 
