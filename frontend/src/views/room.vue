@@ -86,11 +86,13 @@ interface Stream {
   error: StreamFailedError | null;
 }
 
+function videoLoaded() {
+  loading.value = false;
+}
+
 let sessionConnection: RTCPeerConnection | null = null;
 
 onMounted(async () => {
-  assertNotNull(video.value).addEventListener("canplay", () => (loading.value = false));
-
   const connection = (sessionConnection = new RTCPeerConnection(config));
 
   let sessionId: string | null = null;
@@ -302,7 +304,12 @@ onUnmounted(() => {
             {{ configurationSupportedCodecs }}.</span
           >
         </div>
-        <video v-show="!loading && !error" ref="video" class="h-full w-full" autoplay />
+        <video
+          v-show="!loading && !error"
+          ref="video"
+          class="h-full w-full"
+          autoplay
+          @canplay="videoLoaded" />
       </div>
       <p v-show="!streaming" class="text-center text-2xl">no active stream</p>
     </div>
