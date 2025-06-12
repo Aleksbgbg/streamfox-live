@@ -241,7 +241,7 @@ onMounted(async () => {
         {
           const streamId = message.streamEndedPayload.streamId;
 
-          const currentStream = assertNotNull(streams.get(streamId));
+          const endedStream = assertNotNull(streams.get(streamId));
           streams.delete(streamId);
 
           if (currentStreamId.value === streamId) {
@@ -257,10 +257,10 @@ onMounted(async () => {
             }
           }
 
-          if (currentStream.isActive) {
-            const active = assertNotNull(currentStream.active);
-            active.audioTransceiver.stop();
-            active.videoTransceiver.stop();
+          if (endedStream.isActive) {
+            const stream = assertNotNull(endedStream.active);
+            stream.audioTransceiver.stop();
+            stream.videoTransceiver.stop();
           }
         }
         break;
