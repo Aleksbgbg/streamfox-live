@@ -302,7 +302,7 @@ onUnmounted(() => {
             {{ configurationSupportedCodecs }}.</span
           >
         </div>
-        <video v-show="!loading && !error" ref="video" class="max-h-full max-w-full" autoplay />
+        <video v-show="!loading && !error" ref="video" class="h-full w-full" autoplay />
       </div>
       <p v-show="!streaming" class="text-center text-2xl">no active stream</p>
     </div>
