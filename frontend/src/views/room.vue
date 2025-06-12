@@ -50,6 +50,23 @@ const connectionActivity = computed(
 const peers = ref(0);
 const users = computed(() => (channelState.value === Channel.Open ? peers.value + 1 : 0));
 
+function closeChannel() {
+  peers.value = 0;
+  channelState.value = Channel.Closed;
+}
+
+interface Stream {
+  isActive: boolean;
+  active: ActiveStream | null;
+  error: StreamFailedError | null;
+}
+
+interface ActiveStream {
+  videoTransceiver: RTCRtpTransceiver;
+  audioTransceiver: RTCRtpTransceiver;
+  mediaStream: MediaStream;
+}
+
 const streams = new Map<string, Stream>();
 const currentStreamId: Ref<string | null> = ref(null);
 const currentStream = computed(() => {
@@ -95,23 +112,6 @@ const streamCodec = computed(() => {
 });
 const supportedVideoCodecs = sort(computeSupportedVideoCodecs());
 const configurationSupportedCodecs = toHumanReadableList(supportedVideoCodecs, videoCodecToString);
-
-function closeChannel() {
-  peers.value = 0;
-  channelState.value = Channel.Closed;
-}
-
-interface ActiveStream {
-  videoTransceiver: RTCRtpTransceiver;
-  audioTransceiver: RTCRtpTransceiver;
-  mediaStream: MediaStream;
-}
-
-interface Stream {
-  isActive: boolean;
-  active: ActiveStream | null;
-  error: StreamFailedError | null;
-}
 
 function videoLoaded() {
   loading.value = false;
