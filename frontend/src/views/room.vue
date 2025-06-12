@@ -50,9 +50,24 @@ const connectionActivity = computed(
 const peers = ref(0);
 const users = computed(() => (channelState.value === Channel.Open ? peers.value + 1 : 0));
 
+const streams = new Map<string, Stream>();
+const currentStreamId: Ref<string | null> = ref(null);
+
 const loading = ref(false);
-const streaming = ref(false);
-const error: Ref<StreamFailedError | null> = ref(null);
+const streaming = computed(() => currentStreamId.value !== null);
+const error = computed(() => {
+  if (currentStreamId.value === null) {
+    return null;
+  }
+
+  const stream = assertNotNull(streams.get(currentStreamId.value));
+
+  if (stream.isActive) {
+    return null;
+  }
+
+  return stream.error;
+});
 
 const streamCodec = computed(() => {
   if (error.value === null) {
@@ -155,9 +170,6 @@ onMounted(async () => {
     await trickleIceCandidate(props.name, assertNotNull(sessionId), event.candidate.toJSON());
   });
 
-  const streams = new Map<string, Stream>();
-  let currentStreamId: string | null = null;
-
   const channel = connection.createDataChannel("main");
   channel.addEventListener("open", function () {
     channelState.value = Channel.Open;
@@ -195,11 +207,9 @@ onMounted(async () => {
           });
 
           assertNotNull(video.value).srcObject = mediaStream;
-          currentStreamId = streamId;
+          currentStreamId.value = streamId;
 
-          error.value = null;
           loading.value = true;
-          streaming.value = true;
         }
         break;
       case EventType.StreamFailed:
@@ -213,11 +223,9 @@ onMounted(async () => {
             error: err,
           });
 
-          currentStreamId = streamId;
+          currentStreamId.value = streamId;
 
-          error.value = err;
           loading.value = false;
-          streaming.value = true;
         }
         break;
       case EventType.StreamEnded:
@@ -227,29 +235,24 @@ onMounted(async () => {
           const currentStream = assertNotNull(streams.get(streamId));
           streams.delete(streamId);
 
-          if (currentStreamId === streamId) {
+          if (currentStreamId.value === streamId) {
             const next = streams.entries().next();
 
             if (next.value === undefined) {
-              streaming.value = false;
-              error.value = null;
-
-              currentStreamId = null;
+              currentStreamId.value = null;
               assertNotNull(video.value).srcObject = null;
             } else {
               const [streamId, nextStream] = next.value;
 
               if (nextStream.isActive) {
                 assertNotNull(video.value).srcObject = assertNotNull(nextStream.active).mediaStream;
-                currentStreamId = streamId;
+                currentStreamId.value = streamId;
 
-                error.value = null;
                 loading.value = true;
               } else {
                 assertNotNull(video.value).srcObject = null;
-                currentStreamId = streamId;
+                currentStreamId.value = streamId;
 
-                error.value = nextStream.error;
                 loading.value = false;
               }
             }
