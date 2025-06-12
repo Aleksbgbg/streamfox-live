@@ -279,9 +279,7 @@ onUnmounted(() => {
 
 <template>
   <div class="flex h-full flex-col py-3">
-    <div>
-      <h1 class="text-center text-2xl font-bold">{{ name }}</h1>
-    </div>
+    <h1 class="text-center text-2xl font-bold">{{ name }}</h1>
     <div class="flex min-h-0 min-w-0 grow items-center justify-center pt-2 pb-5">
       <div v-show="streaming" class="contents">
         <span v-show="loading" class="loading loading-infinity text-primary h-16 w-16"></span>
