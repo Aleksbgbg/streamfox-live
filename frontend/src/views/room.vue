@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { type Ref, computed, onMounted, onUnmounted, ref } from "vue";
 import { UserIcon } from "@heroicons/vue/24/solid";
+import "media-chrome";
 import { sort } from "@/arrays";
 import { createSession, renegotiateSession, trickleIceCandidate } from "@/endpoints/room";
 import { assertNotNull } from "@/errors";
@@ -304,12 +305,25 @@ onUnmounted(() => {
             {{ configurationSupportedCodecs }}.</span
           >
         </div>
-        <video
+        <media-controller
           v-show="!loading && !error"
-          class="h-full w-full"
-          autoplay
-          :srcObject="currentStream"
-          @canplay="videoLoaded" />
+          class="h-full w-full bg-transparent"
+          gesturesdisabled
+          hotkeys="nospace nok">
+          <video
+            slot="media"
+            class="h-full w-full"
+            autoplay
+            :srcObject="currentStream"
+            @canplay="videoLoaded" />
+          <media-control-bar>
+            <div class="grow bg-[rgb(20_20_30_/_0.7)]" />
+            <media-mute-button></media-mute-button>
+            <media-volume-range></media-volume-range>
+            <media-pip-button></media-pip-button>
+            <media-fullscreen-button></media-fullscreen-button>
+          </media-control-bar>
+        </media-controller>
       </div>
       <p v-show="!streaming" class="text-center text-2xl">no active stream</p>
     </div>

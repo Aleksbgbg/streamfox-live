@@ -21,6 +21,7 @@ export default defineConfigWithVueTs(
     name: "app/rule-overrides",
     rules: {
       "vue/multi-word-component-names": "off",
+      "vue/no-deprecated-slot-attribute": "off",
     },
   },
 );

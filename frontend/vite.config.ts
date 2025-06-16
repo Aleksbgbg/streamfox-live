@@ -5,7 +5,17 @@ import { defineConfig } from "vite";
 import checker from "vite-plugin-checker";
 
 export default defineConfig({
-  plugins: [vue(), tailwindcss(), checker({ vueTsc: true })],
+  plugins: [
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag.startsWith("media"),
+        },
+      },
+    }),
+    tailwindcss(),
+    checker({ vueTsc: true }),
+  ],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

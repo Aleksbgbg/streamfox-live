@@ -17,6 +17,7 @@
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
     "axios": "^1.8.4",
+    "media-chrome": "^4.11.1",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
   },
