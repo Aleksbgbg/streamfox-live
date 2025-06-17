@@ -63,10 +63,6 @@ pub enum HandlerError {
   RegisterDefaultInterceptors(webrtc::Error),
   #[error("Could not create a peer connection: {0}.")]
   CreatePeerConnection(webrtc::Error),
-  #[error("Could not add video transceiver: {0}.")]
-  AddVideoTransceiver(webrtc::Error),
-  #[error("Could not add audio transceiver: {0}.")]
-  AddAudioTransceiver(webrtc::Error),
   #[error("Could not set local description: {0}.")]
   SetLocalDescription(webrtc::Error),
   #[error("Could not get local description.")]
@@ -144,8 +140,6 @@ impl IntoResponse for HandlerError {
       HandlerError::RegisterDefaultCodecs(_)
       | HandlerError::RegisterDefaultInterceptors(_)
       | HandlerError::CreatePeerConnection(_)
-      | HandlerError::AddVideoTransceiver(_)
-      | HandlerError::AddAudioTransceiver(_)
       | HandlerError::SetLocalDescription(_)
       | HandlerError::GetLocalDescription
       | HandlerError::SendMessage

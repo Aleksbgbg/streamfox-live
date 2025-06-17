@@ -20,7 +20,6 @@ use webrtc::interceptor::registry::Registry;
 use webrtc::peer_connection::configuration::RTCConfiguration;
 use webrtc::peer_connection::sdp::sdp_type::RTCSdpType;
 use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
-use webrtc::rtp_transceiver::rtp_codec::RTPCodecType;
 
 static REGEX_ROOM_NAME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-z-]*$").unwrap());
 
@@ -279,15 +278,6 @@ pub async fn create_stream(
       .await
       .map_err(HandlerError::CreatePeerConnection)?,
   );
-
-  peer_connection
-    .add_transceiver_from_kind(RTPCodecType::Video, None)
-    .await
-    .map_err(HandlerError::AddVideoTransceiver)?;
-  peer_connection
-    .add_transceiver_from_kind(RTPCodecType::Audio, None)
-    .await
-    .map_err(HandlerError::AddAudioTransceiver)?;
 
   let mut gather_complete = peer_connection.gathering_complete_promise().await;
 
