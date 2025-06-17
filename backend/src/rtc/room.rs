@@ -23,8 +23,6 @@ const MSID_MAX_LEN: usize = 64;
 const THIRD_PARTY_REMOVAL_ERR: &str =
   "another execution context removed this room from the global map";
 
-const STREAM_TRACK_COUNT: usize = 2;
-
 const RTP_BUFFER_SIZE_BYTES: usize = 4096;
 const RTCP_BUFFER_SIZE_BYTES: usize = 4096;
 
@@ -110,9 +108,14 @@ impl RoomTask {
         } => self.establish_session(session_id, data_channel).await,
         Message::CreateStream {
           peer_connection,
+          track_count,
           response,
           ..
-        } => self.create_stream(peer_connection, response).await,
+        } => {
+          self
+            .create_stream(peer_connection, track_count, response)
+            .await
+        }
         Message::HandleStreamTrack {
           stream_id,
           remote_track,
@@ -252,6 +255,7 @@ impl RoomTask {
   async fn create_stream(
     &mut self,
     peer_connection: Arc<RTCPeerConnection>,
+    track_count: usize,
     response: Sender<Result<response::CreateStream, HandlerError>>,
   ) {
     let result = {
@@ -301,7 +305,8 @@ impl RoomTask {
           video_codec: None,
           established: false,
           peer_connection,
-          tracks: Vec::with_capacity(STREAM_TRACK_COUNT),
+          track_count,
+          tracks: Vec::with_capacity(track_count),
         },
       );
 
@@ -360,7 +365,7 @@ impl RoomTask {
 
     stream.tracks.push(local_track);
 
-    if stream.tracks.len() != STREAM_TRACK_COUNT {
+    if stream.tracks.len() != stream.track_count {
       return;
     }
 

@@ -10,5 +10,6 @@ pub struct Stream {
   pub established: bool,
   pub video_codec: Option<VideoCodec>,
   pub peer_connection: Arc<RTCPeerConnection>,
+  pub track_count: usize,
   pub tracks: Vec<Arc<TrackLocalStaticRTP>>,
 }

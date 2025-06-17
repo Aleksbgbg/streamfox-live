@@ -26,6 +26,7 @@ pub enum Message {
   },
   CreateStream {
     peer_connection: Arc<RTCPeerConnection>,
+    track_count: usize,
     response: Sender<Result<response::CreateStream, HandlerError>>,
     _ref: Ref,
   },

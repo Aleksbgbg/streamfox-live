@@ -334,6 +334,7 @@ pub async fn create_stream(
         .channel
         .send_async(Message::CreateStream {
           peer_connection,
+          track_count: transceivers.len(),
           response: sender,
           _ref: r#ref,
         })
