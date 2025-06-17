@@ -501,18 +501,20 @@ impl RoomTask {
   }
 
   async fn send(&self, session: &Session, message: &Bytes) {
-    if let Some(data_channel) = &session.data_channel {
-      let result = data_channel.send(message).await;
+    let data_channel = session
+      .data_channel
+      .as_ref()
+      .expect("attempted to send a message to a session that is not yet established");
+    let result = data_channel.send(message).await;
 
-      if result.is_err() {
-        self
-          .sender
-          .send_async(Message::DestroySession {
-            session_id: session.id,
-          })
-          .await
-          .unwrap();
-      }
+    if result.is_err() {
+      self
+        .sender
+        .send_async(Message::DestroySession {
+          session_id: session.id,
+        })
+        .await
+        .unwrap();
     }
   }
 }
