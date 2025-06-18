@@ -119,9 +119,9 @@ pub async fn create_session(
       room
         .channel
         .send_async(Message::CreateSession {
-          supported_video_codecs: request.supported_video_codecs.clone(),
-          peer_connection: Arc::clone(&peer_connection),
-          response: sender.clone(),
+          supported_video_codecs: request.supported_video_codecs,
+          peer_connection,
+          response: sender,
           _ref: r#ref,
         })
         .await
@@ -329,8 +329,8 @@ pub async fn create_stream(
       room
         .channel
         .send_async(Message::CreateStream {
-          peer_connection: Arc::clone(&peer_connection),
-          response: sender.clone(),
+          peer_connection,
+          response: sender,
           _ref: r#ref,
         })
         .await
