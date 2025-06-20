@@ -289,6 +289,10 @@ pub async fn create_stream(
     .await
     .map_err(HandlerError::SetRemoteDescription)?;
 
+  if peer_connection.get_transceivers().await.is_empty() {
+    return Err(HandlerError::NoTransceivers);
+  }
+
   let answer = peer_connection
     .create_answer(None)
     .await

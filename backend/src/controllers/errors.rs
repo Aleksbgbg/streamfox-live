@@ -51,6 +51,8 @@ pub enum HandlerError {
   CreateAnswer(webrtc::Error),
   #[error("Could not add trickle ICE candidate: {0}.")]
   AddIceCandidate(webrtc::Error),
+  #[error("No transceivers were transmitted by the client: no media to stream.")]
+  NoTransceivers,
 
   #[error("Room '{0}' does not exist.")]
   RoomNotFound(String),
@@ -131,7 +133,8 @@ impl IntoResponse for HandlerError {
       HandlerError::JsonRejection(_)
       | HandlerError::SetRemoteDescription(_)
       | HandlerError::CreateAnswer(_)
-      | HandlerError::AddIceCandidate(_) => self.as_generic(StatusCode::BAD_REQUEST),
+      | HandlerError::AddIceCandidate(_)
+      | HandlerError::NoTransceivers => self.as_generic(StatusCode::BAD_REQUEST),
 
       HandlerError::RoomNotFound(_) | HandlerError::SessionNotFound(_) => {
         self.as_generic(StatusCode::NOT_FOUND)
