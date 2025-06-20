@@ -480,6 +480,10 @@ impl RoomTask {
   async fn broadcast(&self, event: &Event) {
     let message = serialize(event);
     for session in self.sessions.values() {
+      if !session.established() {
+        continue;
+      }
+
       self.send(session, &message).await;
     }
   }
@@ -487,7 +491,7 @@ impl RoomTask {
   async fn multicast(&self, source: SessionId, event: &Event) {
     let message = serialize(event);
     for (session_id, session) in &self.sessions {
-      if *session_id == source {
+      if (!session.established()) || (*session_id == source) {
         continue;
       }
 
