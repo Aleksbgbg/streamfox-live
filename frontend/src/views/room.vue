@@ -317,7 +317,8 @@ onUnmounted(() => {
             class="h-full w-full"
             autoplay
             :srcObject="currentStream"
-            @canplay="videoLoaded" />
+            @canplay="videoLoaded"
+            @contextmenu="(e) => e.preventDefault()" />
           <media-control-bar>
             <div class="grow bg-[rgb(20_20_30_/_0.7)]" />
             <media-mute-button></media-mute-button>
