@@ -68,7 +68,7 @@ async function enter() {
         <p class="text-error text-sm" v-for="err of error.specific.name" :key="err">{{ err }}</p>
       </div>
       <label v-if="!joiningRoom" class="label text-neutral">
-        <input type="checkbox" class="toggle" v-model="remember" />
+        <input type="checkbox" class="checkbox checkbox-neutral rounded" v-model="remember" />
         Remember room name
       </label>
       <div class="card-actions">
