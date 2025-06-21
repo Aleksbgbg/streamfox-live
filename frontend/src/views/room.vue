@@ -10,6 +10,8 @@ import { type Event, EventType, type StreamFailedError, StreamFailedErrorCode } 
 import { toHumanReadableList } from "@/strings";
 import { config, dataChannelMessageToString } from "@/webrtc";
 
+const pipAvailable = !!document.pictureInPictureEnabled;
+
 const props = defineProps<{
   name: string;
 }>();
@@ -320,7 +322,7 @@ onUnmounted(() => {
             <div class="grow bg-[rgb(20_20_30_/_0.7)]" />
             <media-mute-button></media-mute-button>
             <media-volume-range></media-volume-range>
-            <media-pip-button></media-pip-button>
+            <media-pip-button v-if="pipAvailable"></media-pip-button>
             <media-fullscreen-button></media-fullscreen-button>
           </media-control-bar>
         </media-controller>
