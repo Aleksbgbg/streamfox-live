@@ -259,6 +259,7 @@ dependencies = [
  "flume",
  "log",
  "regex",
+ "rustix",
  "serde",
  "serde_json",
  "serde_repr",

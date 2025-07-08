@@ -22,6 +22,16 @@ impl From<LogLevelFilter> for LevelFilter {
   }
 }
 
+pub enum HttpSocket<#[cfg(unix)] 'a> {
+  Tcp {
+    port: u16,
+  },
+  #[cfg(unix)]
+  Unix {
+    path: &'a std::path::Path,
+  },
+}
+
 pub enum WebRtcPortMapping {
   /// Multiplex all connections on the specified port
   SinglePort { port_mux: u16 },
@@ -38,8 +48,19 @@ pub struct Args {
   pub public_ip: String,
 
   /// Accept HTTP requests on the specified TCP port
+  #[cfg(windows)]
   #[arg(long)]
-  pub http_port: u16,
+  http_port: u16,
+
+  /// Accept HTTP requests on the specified TCP port
+  #[cfg(unix)]
+  #[arg(long, required_unless_present = "http_unix_socket")]
+  http_port: Option<u16>,
+
+  /// Accept HTTP requests on the specified Unix socket path
+  #[cfg(unix)]
+  #[arg(long, conflicts_with = "http_port")]
+  http_unix_socket: Option<std::path::PathBuf>,
 
   /// Multiplex all WebRTC connections on the specified UDP port
   #[arg(long, required_unless_present = "webrtc_port_min")]
@@ -72,6 +93,24 @@ pub struct Args {
 }
 
 impl Args {
+  #[cfg(windows)]
+  pub fn http_socket(&self) -> HttpSocket {
+    HttpSocket::Tcp {
+      port: self.http_port,
+    }
+  }
+
+  #[cfg(unix)]
+  pub fn http_socket(&self) -> HttpSocket<'_> {
+    if let Some(port) = self.http_port {
+      HttpSocket::Tcp { port }
+    } else {
+      HttpSocket::Unix {
+        path: self.http_unix_socket.as_ref().unwrap(),
+      }
+    }
+  }
+
   pub fn webrtc_ports(&self) -> WebRtcPortMapping {
     if let Some(port_mux) = self.webrtc_port_mux {
       WebRtcPortMapping::SinglePort { port_mux }

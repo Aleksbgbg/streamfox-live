@@ -3,8 +3,10 @@ mod controllers;
 mod debug;
 mod refcount;
 mod rtc;
+#[cfg(unix)]
+mod unix_socket;
 
-use crate::args::{Args, WebRtcPortMapping};
+use crate::args::{Args, HttpSocket, WebRtcPortMapping};
 use crate::controllers::room;
 use crate::debug::webrtc_logs;
 use crate::debug::webrtc_logs::InitWebRtcLogsError;
@@ -32,8 +34,6 @@ const IP_V4_UNSPECIFIED_ADDRESS: [u8; 4] = [0, 0, 0, 0];
 enum AppError {
   #[error(transparent)]
   InitLogsError(#[from] InitWebRtcLogsError),
-  #[error("could not bind TCP socket: {0}")]
-  BindTcpListener(std::io::Error),
   #[error("could not bind UDP socket: {0}")]
   BindUdpSocket(std::io::Error),
   #[error("could not create ephemeral UDP port range: {0}")]
@@ -42,8 +42,13 @@ enum AppError {
   GetCurrentExe(std::io::Error),
   #[error("could not get frontend static files directory")]
   GetFrontendDir,
+  #[error("could not bind TCP socket: {0}")]
+  BindTcpListener(std::io::Error),
   #[error("could not get TCP listener address: {0}")]
   GetListenerAddress(std::io::Error),
+  #[cfg(unix)]
+  #[error("could not bind Unix socket: {0}")]
+  CreateUnixSocket(#[from] crate::unix_socket::CreateUnixSocketError),
   #[error("could not start Axum server: {0}")]
   ServeApp(std::io::Error),
 }
@@ -81,13 +86,6 @@ async fn create_webrtc_app_config(args: &Args) -> Result<WebRtcAppConfig, AppErr
 async fn start(args: &Args) -> Result<(), AppError> {
   webrtc_logs::init(args)?;
 
-  let listener = TcpListener::bind(SocketAddr::from((
-    IP_V4_UNSPECIFIED_ADDRESS,
-    args.http_port,
-  )))
-  .await
-  .map_err(AppError::BindTcpListener)?;
-
   let api = Router::new()
     .route("/room/validate-name", routing::post(room::validate_name))
     .route("/room/{name}/session", routing::post(room::create_session))
@@ -124,12 +122,40 @@ async fn start(args: &Args) -> Result<(), AppError> {
         .on_response(DefaultOnResponse::new().level(Level::INFO)),
     );
 
-  info!(
-    "[ HTTP ] TCP socket listening on {}",
-    listener
-      .local_addr()
-      .map_err(AppError::GetListenerAddress)?
-  );
+  let serve = match args.http_socket() {
+    HttpSocket::Tcp { port } => {
+      let listener = TcpListener::bind(SocketAddr::from((IP_V4_UNSPECIFIED_ADDRESS, port)))
+        .await
+        .map_err(AppError::BindTcpListener)?;
+
+      info!(
+        "[ HTTP ] TCP socket listening on {}",
+        listener
+          .local_addr()
+          .map_err(AppError::GetListenerAddress)?
+      );
+
+      axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .into_future()
+    }
+    #[cfg(unix)]
+    HttpSocket::Unix { path } => {
+      use crate::unix_socket::UnixSocket;
+
+      let socket = UnixSocket::new(path).await?;
+
+      info!(
+        "[ HTTP ] Unix domain socket listening at {}",
+        socket.path().display()
+      );
+
+      axum::serve(socket, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .into_future()
+    }
+  };
+
   info!(
     "[WebRTC] UDP socket listening on {}:{}",
     args.public_ip,
@@ -139,10 +165,7 @@ async fn start(args: &Args) -> Result<(), AppError> {
     }
   );
 
-  axum::serve(listener, app)
-    .with_graceful_shutdown(shutdown_signal())
-    .await
-    .map_err(AppError::ServeApp)?;
+  serve.await.map_err(AppError::ServeApp)?;
 
   Ok(())
 }

@@ -51,6 +51,8 @@
       with lib; let
         description = "WebRTC screen sharing server";
         cfg = config.services.streamfoxLive;
+        runtimeFilesDir = "/var/run/streamfox-live";
+        socketPath = "${runtimeFilesDir}/http.sock";
       in {
         options.services.streamfoxLive = {
           enable = mkEnableOption description;
@@ -61,8 +63,17 @@
           };
 
           httpPort = mkOption {
-            type = types.ints.u16;
+            type = types.nullOr types.ints.u16;
+            default = null;
             description = "Accept HTTP requests on the specified TCP port";
+          };
+
+          httpUnixSocket = mkOption {
+            type = types.bool;
+            default = false;
+            description = ''
+              Whether to accept HTTP requests over a unix socket (located at ${socketPath})
+            '';
           };
 
           webRtcPortMux = mkOption {
@@ -93,41 +104,61 @@
         };
 
         config = mkIf cfg.enable {
-          systemd.services.streamfox-live = {
-            inherit description;
-            wantedBy = ["multi-user.target"];
+          users.groups."streamfox-live" = {};
+          users.users."streamfox-live" = {
+            group = "streamfox-live";
+            isSystemUser = true;
+          };
 
-            serviceConfig = {
-              ExecStart = utils.escapeSystemdExecArgs (
-                [
-                  "${self.packages.${pkgs.system}.default}/bin/backend"
-                  "--public-ip"
-                  cfg.publicIp
-                  "--http-port"
-                  cfg.httpPort
-                ]
-                ++ lists.flatten
-                (
-                  lists.optional
-                  (cfg.webRtcPortMux != null)
-                  ["--webrtc-port-mux" cfg.webRtcPortMux]
-                )
-                ++ lists.flatten
-                (
-                  lists.optional
-                  ((cfg.webRtcPortMin != null) && (cfg.webRtcPortMax != null))
-                  ["--webrtc-port-min" cfg.webRtcPortMin "--webrtc-port-max" cfg.webRtcPortMax]
-                )
-                ++ lists.flatten
-                (
-                  lists.optional
-                  (cfg.debug.webRtcLogLevel != null)
-                  ["--webrtc-log-level" cfg.debug.webRtcLogLevel]
-                )
-              );
-              Restart = "always";
-              Type = "exec";
+          systemd = {
+            services.streamfox-live = {
+              inherit description;
+              wantedBy = ["multi-user.target"];
+
+              serviceConfig = {
+                ExecStart = utils.escapeSystemdExecArgs (
+                  [
+                    "${self.packages.${pkgs.system}.default}/bin/backend"
+                    "--public-ip"
+                    cfg.publicIp
+                  ]
+                  ++ (
+                    if cfg.httpUnixSocket
+                    then ["--http-unix-socket" socketPath]
+                    else ["--http-port" cfg.httpPort]
+                  )
+                  ++ lists.flatten
+                  (
+                    lists.optional
+                    (cfg.webRtcPortMux != null)
+                    ["--webrtc-port-mux" cfg.webRtcPortMux]
+                  )
+                  ++ lists.flatten
+                  (
+                    lists.optional
+                    ((cfg.webRtcPortMin != null) && (cfg.webRtcPortMax != null))
+                    ["--webrtc-port-min" cfg.webRtcPortMin "--webrtc-port-max" cfg.webRtcPortMax]
+                  )
+                  ++ lists.flatten
+                  (
+                    lists.optional
+                    (cfg.debug.webRtcLogLevel != null)
+                    ["--webrtc-log-level" cfg.debug.webRtcLogLevel]
+                  )
+                );
+
+                User = "streamfox-live";
+                Group = "streamfox-live";
+
+                Restart = "always";
+                Type = "exec";
+              };
             };
+
+            tmpfiles.rules = mkIf cfg.httpUnixSocket [
+              # Type Path Mode User Group Age Argument
+              "d ${runtimeFilesDir} 0755 streamfox-live streamfox-live - -"
+            ];
           };
         };
       };

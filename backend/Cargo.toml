@@ -32,4 +32,5 @@ webrtc = { version = "0.13.0" }
 
 [target.'cfg(unix)'.dependencies]
 filedescriptor = { version = "0.8.3", default-features = false }
+rustix = { version = "1.0.7", default-features = false, features = ["fs", "process"] }
 systemd-journal-logger = { version = "2.2.2", default-features = false }
