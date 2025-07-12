@@ -125,13 +125,13 @@ async fn start(args: &Args) -> Result<(), AppError> {
     );
 
   info!(
-    "[ HTTP ] TCP listening on {}",
+    "[ HTTP ] TCP socket listening on {}",
     listener
       .local_addr()
       .map_err(AppError::GetListenerAddress)?
   );
   info!(
-    "[WebRTC] UDP listening on {}:{}",
+    "[WebRTC] UDP socket listening on {}:{}",
     args.public_ip,
     match args.webrtc_ports() {
       WebRtcPortMapping::SinglePort { port_mux } => port_mux.to_string(),
