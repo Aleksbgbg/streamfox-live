@@ -32,7 +32,7 @@ const IP_V4_UNSPECIFIED_ADDRESS: [u8; 4] = [0, 0, 0, 0];
 enum AppError {
   #[error(transparent)]
   InitLogsError(#[from] InitWebRtcLogsError),
-  #[error("could not bind to network interface: {0}")]
+  #[error("could not bind TCP socket: {0}")]
   BindTcpListener(std::io::Error),
   #[error("could not bind UDP socket: {0}")]
   BindUdpSocket(std::io::Error),
