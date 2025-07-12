@@ -34,7 +34,7 @@ enum AppError {
   InitLogsError(#[from] InitWebRtcLogsError),
   #[error("could not bind to network interface: {0}")]
   BindTcpListener(std::io::Error),
-  #[error("Could not bind UDP socket: {0}.")]
+  #[error("could not bind UDP socket: {0}")]
   BindUdpSocket(std::io::Error),
   #[error("could not create ephemeral UDP port range: {0}")]
   CreateEphemeralUdpPortRange(webrtc::ice::Error),
